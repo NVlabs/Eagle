@@ -1,2 +1,1273 @@
-hello world
-test
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script> -->
+    <script defer src="https://busuanzi.9420.ltd/js"></script>
+    <!-- <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script> -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaling Vision Pre-Training to 4K Resolution</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <style>
+        :root {
+            color-scheme: light;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+            /* Adjust this value to make the spacing larger */
+            margin: 0;
+            padding: 0;
+            color: black;
+            /* background-image: url('asset/samples/pexels-photo-28821825.jpeg');  */
+            background-size: contain;
+            /* Cover the entire viewport */
+            background-attachment: fixed;
+            /* Fixed background */
+            background-position: center;
+            direction: ltr;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 50px 0;
+            background-color: #fff;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            margin: 0.2em 0;
+            font-family: 'Inter', sans-serif;  /* Using Inter font */
+            color: #76b900;  /* Dark gray color */
+            font-weight: 700;  /* Bold weight */
+        }
+
+        .hero h2 {
+            font-size: 2.8em;
+            margin: 0.2em 0;
+            font-weight: normal;
+            line-height: 1.4;
+            /* Adjust this value to make the spacing larger */
+        }
+
+        .hero p {
+            font-size: 1.4em;
+            margin-bottom: 1em;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 1.1em;
+            color: white;
+            background-color: rgb(246, 172, 102);
+            border-radius: 30px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background-color: rgb(236, 162, 92);
+        }
+
+        .button .icon {
+            margin-right: 8px;
+        }
+
+        .button .icon img {
+            height: 1em;
+            width: auto;
+            vertical-align: middle;
+        }
+
+        .gallery-container {
+            max-width: 75%;
+            /* Limit the width of the gallery */
+            margin: 0 auto;
+            /* Center the gallery */
+            padding: 20px 0;
+            /* Add some padding on top and bottom */
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            /* 12 columns grid */
+            grid-auto-rows: 150px;
+            /* Adjust row height */
+            gap: 10px;
+        }
+
+        .gallery-item {
+            overflow: hidden;
+            /*aspect-ratio: 1/1; !* Keep the aspect ratio of the images *!*/
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            /*object-fit: cover;*/
+            object-fit: contain;
+            cursor: pointer;
+            /* Cursor change on hover */
+            border-radius: 20px;
+            /* Rounded corners */
+            transition: transform 0.3s ease;
+            /* Add smooth transition */
+        }
+
+        /* Image scaling on hover */
+        .gallery-item img:hover {
+            transform: scale(1.1);
+            /* Scale the image to 1.2 times its original size */
+        }
+
+        /* Define specific grid item placements */
+        .item1 {
+            grid-column: span 12;
+            grid-row: span 4;
+        }
+
+        /* Large image */
+        /* Modal styling */
+        #modal {
+            display: none;
+            /* Hidden by default */
+            position: fixed;
+            /* Stay in place */
+            z-index: 1;
+            /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%;
+            /* Full width */
+            height: 100%;
+            /* Full height */
+            overflow: auto;
+            /* Enable scroll if needed */
+            background-color: rgba(0, 0, 0, 0.9);
+            /* Black w/ opacity */
+            justify-content: center;
+            /* Horizontally center the image */
+            flex-direction: column;
+            align-items: center;
+            /* Center align items vertically */
+        }
+
+        #modal img {
+            margin: auto;
+            display: block;
+            max-width: 77%;
+            max-height: 77%;
+            /* Ensure the image doesn't overflow vertically */
+            object-fit: contain;
+            /* Make sure the aspect ratio is preserved */
+        }
+
+        #modal-description {
+            color: white;
+            text-align: center;
+            margin-top: 10px;
+            /* Adjust this value to move text closer to the image */
+            font-size: 1.2em;
+        }
+
+        .description {
+            font-family: Arial, sans-serif;
+            font-style: normal;
+            font-size: 17px;
+            line-height: 1.47;
+            color: #333;
+            /*color: black; !* Text color *!*/
+            letter-spacing: -0.022em;
+            font-weight: 400;
+            background-color: #fff;
+            /* Solid background color that spans the entire width */
+            padding: 20px 0;
+            /* Add vertical padding */
+            text-align: center;
+            /* Center align text */
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 2px 4px 12px #00000054;
+        }
+
+        .description_noborder {
+            font-family: Arial, sans-serif;
+            font-style: normal;
+            font-size: 17px;
+            line-height: 1.47;
+            color: #333;
+            /*color: black; !* Text color *!*/
+            letter-spacing: -0.022em;
+            font-weight: 400;
+            background-color: #fff;
+            /* Solid background color that spans the entire width */
+            padding: 20px 0;
+            /* Add vertical padding */
+            text-align: center;
+            /* Center align text */
+        }
+
+        .description-content {
+            /*background-color: rgba(255, 255, 255, 0.1); !* Semi-transparent background inside the section *!*/
+            /*border: 2px solid #555; !* Adding a lighter border *!*/
+            max-width: 65%;
+            /* Limit the width to 80% of the screen */
+            margin: 0 auto;
+            /* Center the content horizontally */
+            padding: 20px;
+            /* Padding inside the border */
+            font-style: normal;
+            border-radius: 18px;
+            /*box-shadow: 2px 4px 12px #00000014;*/
+        }
+
+        .description-content h1 {
+            display: block;
+            color: black;
+            font-size: 2.1em;
+            /* Adjust size as needed */
+            line-height: 1.2;
+            font-weight: bold;
+            text-align: center;
+            /* Center-align the h1 */
+            margin-top: 1em;
+            margin-bottom: 0.4em;
+            /* Adjust top and bottom margin as needed */
+            font-family: 'Inter', sans-serif;  /* Using Inter font */
+            font-weight: 600;  /* Bold weight */
+        }
+
+        .description-content h2 {
+            display: block;
+            color: black;
+            font-size: 1.5em;
+            line-height: 1.125;
+            letter-spacing: .004em;
+            font-weight: 580;
+            text-align: left;
+            /* Center-align the h2 */
+            margin-block-start: 0.83em;
+            margin-block-end: 0.83em;
+            margin-inline-start: 0px;
+            margin-inline-end: 0px;
+            font-style: normal;
+        }
+
+        .description-content p {
+            font-size: 1.1em;
+            text-align: left;
+            /* Left-align the p */
+            font-weight: normal;
+        }
+
+        .citation {
+            /*background-color: #333; !* Solid background color that spans the entire width *!*/
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            /* Solid background color that spans the entire width */
+            color: black;
+            padding: 10px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .citation-content {
+            text-align: left;
+            border-radius: 15px;
+            /* Rounded corners */
+            font-size: 0.8em;
+            max-width: 80%;
+            /* Limit the width to 80% of the screen */
+            margin: 0 auto;
+            /* Center the content horizontally */
+            margin-top: -30px;
+            padding: 0;
+            /* Padding inside the border */
+            background-color: #f5f5f5;
+            /* Semi-transparent background inside the section */
+            overflow-x: auto;
+            /* Horizontal scrolling */
+            overflow-y: hidden;
+            /* Prevent vertical scrolling */
+            white-space: nowrap;
+            /* Prevent line breaks */
+        }
+
+        .citation-content h2 {
+            font-size: 2em;
+            text-align: left;
+            font-weight: normal;
+        }
+
+        .citation pre {
+            border-radius: 15px;
+            /* Rounded corners */
+            max-width: 90%;
+            /* Limit the width to 80% of the screen */
+            text-align: left;
+        }
+
+        .footer {
+            background-color: #f5f5f5;
+            box-shadow: 2px 4px 12px #00000054;
+            color: #333;
+            padding: 20px;
+            text-align: center;
+            margin-top: -20px;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+        }
+
+        .footer a {
+            color: dodgerblue;
+            text-decoration: none;
+        }
+
+        .inserted-image {
+            max-width: 80%;
+            /* Set the maximum width for the image */
+            height: auto;
+            /* Ensure the height adjusts automatically to maintain aspect ratio */
+            margin: 30px;
+            /* Add space above and below the image */
+            margin-top: 10px;
+            display: block;
+            /* Make sure the image is treated as a block-level element */
+            margin-left: auto;
+            /* Center the image horizontally */
+            margin-right: auto;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px 3px #00000030;
+        }
+
+        .inserted-image-noshadow {
+            max-width: 30%;
+            /* Set the maximum width for the image */
+            margin-left: auto;
+            /* Center the image horizontally */
+            margin-right: auto;
+            border-radius: 10px;
+        }
+
+        .video-container {
+            text-align: center;
+            /* Center the video horizontally */
+            margin: 20px 0;
+            /* Add some vertical margin around the video */
+        }
+
+        video {
+            max-width: 80%;
+            /* The video will scale to fit the container */
+            height: auto;
+            /* Maintain the video's aspect ratio */
+            border-radius: 10px;
+            /* Rounded corners for the video */
+            box-shadow: 2px 2px 10px 3px #00000054;
+        }
+
+        .logo {
+            color: black;
+            display: flex;
+            justify-content: center;
+            /*justify-content: left;*/
+            align-items: center;
+            text-align: center;
+            gap: 60px;
+        }
+
+        .logo-sup {
+            position: absolute;
+            top: -5px;
+            /* Adjust this value to position it closer to the top */
+            right: -10px;
+            /* Adjust this value to move it horizontally */
+            font-size: 14px;
+            /* Increase the size of the superscript */
+            color: black;
+            /* Change the color if needed */
+        }
+
+        /* Image comparison container */
+        .image-comparison-container {
+            background-color: #fff;
+            /* Solid background color that spans the entire width */
+        }
+
+        .image-comparison-content {
+            position: relative;
+            width: 580px;
+            /* Adjust the width as needed */
+            height: 402px;
+            /* Adjust the height as needed */
+            overflow: hidden;
+            /* Make sure overflow isn't hiding any part of the images */
+            margin: 0 auto;
+            margin-top: -20px;
+            cursor: ew-resize;
+            border-radius: 10px;
+        }
+
+        .image-comparison-content img {
+            position: absolute;
+            width: 100%;
+            height: 99%;
+            background-color: #fff;
+            object-fit: contain;
+            /* Use contain to ensure the whole image is visible */
+        }
+
+        .image-comparison-content .slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background-color: #fff;
+            z-index: 10;
+        }
+
+        .image-comparison-content .slider-black {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background-color: black;
+            z-index: 10;
+        }
+
+        .demo {
+            margin-top: -20px;
+            background-color: #fff;
+            text-align: center;
+        }
+
+        .demo iframe {
+            width: 50%;
+        }
+
+        .image-comparison-content .image-2 {
+            clip-path: inset(0 0 0 50%);
+        }
+
+        .image-comparison-content .image-4 {
+            clip-path: inset(0 0 0 50%);
+        }
+
+        @media (max-width: 4096px) {
+            .gallery {
+                /*grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); !* Adjust columns for smaller screens *!*/
+                grid-auto-columns: 100px;
+                /* Adjust columns for smaller screens */
+                grid-auto-rows: 200px;
+                /* Set a fixed height for the grid items */
+            }
+
+            .demo iframe {
+                width: 800px;
+            }
+        }
+
+        @media (max-width: 2048px) {
+            .gallery {
+                /*grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); !* Adjust columns for smaller screens *!*/
+                grid-auto-columns: 60px;
+                /* Adjust columns for smaller screens */
+                grid-auto-rows: 90px;
+                /* Set a fixed height for the grid items */
+            }
+
+            .demo iframe {
+                width: 800px;
+            }
+        }
+
+        @media (min-width: 2048px) {
+            .description-content {
+                max-width: 728px;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .citation-content {
+                max-width: 728px;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image {
+                max-width: 1024px;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image-noshadow {
+                max-width: 728px;
+                /* Limit the width to 80% of the screen */
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            .inserted-image-noshadow-small {
+                max-width: 600px;
+                /* Limit the width to 80% of the screen */
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            video {
+                max-width: 1024px;
+                /* The video will scale to fit the container */
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .gallery {
+                /*grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); !* Adjust columns for smaller screens *!*/
+                grid-auto-columns: 40px;
+                /* Adjust columns for smaller screens */
+                grid-auto-rows: 70px;
+                /* Set a fixed height for the grid items */
+            }
+
+            .demo iframe {
+                width: 80%;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .description-content {
+                max-width: 840px;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .citation-content {
+                max-width: 768px;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image {
+                max-width: 826px;
+                /* Limit the width to 80% of the screen */
+                padding: 5px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image-noshadow {
+                max-width: 840px;
+                /* Limit the width to 80% of the screen */
+                max-height: 400px;
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            .inserted-image-noshadow-small {
+                max-width: 600px;
+                /* Limit the width to 80% of the screen */
+                max-height: 300px;
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            video {
+                max-width: 728px;
+                /* The video will scale to fit the container */
+            }
+        }
+
+        @media (max-width: 768px) {
+            .gallery {
+                /*grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); !* Adjust columns for smaller screens *!*/
+                grid-auto-columns: 20px;
+                /* Adjust columns for smaller screens */
+                grid-auto-rows: 30px;
+                /* Set a fixed height for the grid items */
+                gap: 5px;
+            }
+
+            .gallery-container {
+                max-width: 85%;
+                /* Limit the width of the gallery */
+                padding: 10px 0;
+                /* Add some padding on top and bottom */
+            }
+
+            .hero h1 {
+                font-size: 3em;
+            }
+
+            .hero h2 {
+                font-size: 2em;
+            }
+
+            .hero p {
+                font-size: 1em;
+            }
+
+            .description-content {
+                max-width: 92%;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .citation-content {
+                max-width: 92%;
+                /* Limit the width to 80% of the screen */
+                padding: 10px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image {
+                max-width: 95%;
+                /* Limit the width to 80% of the screen */
+                padding: 5px;
+                /* Padding inside the border */
+            }
+
+            .inserted-image-noshadow {
+                max-width: 92%;
+                /* Limit the width to 80% of the screen */
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            .inserted-image-noshadow-small {
+                max-width: 70%;
+                /* Limit the width to 80% of the screen */
+                margin-left: auto;
+                /* Center the image horizontally */
+                margin-right: auto;
+            }
+
+            video {
+                max-width: 92%;
+                /* The video will scale to fit the container */
+            }
+
+            .logo {
+                gap: 10px;
+            }
+
+            .demo iframe {
+                width: 95%;
+            }
+        }
+
+        /* Dark mode */
+
+        /* Add this new style for reference links */
+        .reference-link {
+            color: inherit; /* Keeps the original text color */
+            text-decoration: underline; /* Adds underline */
+        }
+    </style>
+</head>
+
+<body>
+    <!--    <div style="overflow: hidden; background-color: #6699cc;">-->
+    <!--      <div class="container">-->
+    <!--        <a href="https://www.nvidia.com/" style="float: left; color: black; text-align: center; padding: 12px 16px; text-decoration: none; font-size: 16px;"><img width="100%" src="https://nv-tlabs.github.io/3DStyleNet/assets/nvidia.svg"></a>-->
+    <!--        <a href="https://github.com/Efficient-Large-Model/" style="float: left; color: black; text-align: center; padding: 14px 16px; text-decoration: none; font-size: 16px;"><strong>Efficient AI Group</strong></a>-->
+    <!--      </div>-->
+    <!--    </div>-->
+    <div class="hero">
+        <h1>
+            Scaling Vision Pre-Training to 4K Resolution
+        </h1>
+
+        <!-- Add author and institution information -->
+        <div style="margin-top: 30px; text-align: center;">
+            <p style="font-size: 1.4em; margin-bottom: 5px; width: 80%; margin: auto">
+                <a href="https://bfshi.github.io" target="_blank" style="color: #6f6f6f; text-decoration: none;">Baifeng Shi</a><sup style="font-size: 0.6em;">1,2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://sites.google.com/site/boyilics/home" target="_blank" style="color: #6f6f6f; text-decoration: none;">Boyi Li</a><sup style="font-size: 0.6em;">1,2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://han-cai.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Han Cai</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=OI7zFmwAAAAJ&hl=en/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Yao Lu</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://sifeiliu.net/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Sifei Liu</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://research.nvidia.com/person/marco-pavone" target="blank" style="color: #6f6f6f; text-decoration: none;">Marco Pavone</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://jankautz.com/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Jan Kautz</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://hanlab.mit.edu/songhan/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Song Han</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://people.eecs.berkeley.edu/~trevor/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Trevor Darrell</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://www.pmolchanov.com/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Pavlo Molchanov</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://hongxu-yin.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Hongxu Yin</a><sup style="font-size: 0.6em;">2</sup>
+            </p>
+            <!-- <p style="font-size: 1.2em; color: #888;">
+                <sup>1</sup>UC Berkeley
+                <sup>2</sup>NVIDIA
+            </p> -->
+        </div>
+               <!-- <div style="overflow: hidden; background-color: #6699cc;"> -->
+        <div style="overflow: hidden; background-color: #fff;">
+
+            <div class="logo" style="padding-top: 30px; padding-bottom: 0px;">
+                <div style="position: relative; display: inline-block;">
+                    <sup style="position: absolute; left: -10px; top: 0;">1</sup>
+                    <a href="https://www.berkeley.edu/" style="text-decoration: none; font-size: 16px;">
+                        <img src="asset/University_of_California,_Berkeley.png" alt="Berkeley Logo"
+                            style="width: auto; height: 40px;">
+                    </a>
+                </div>
+                <div style="position: relative; display: inline-block;">
+                    <sup style="position: absolute; left: -10px; top: -5px;">2</sup>
+                    <a href="https://www.nvidia.com/" style="text-decoration: none; font-size: 16px;">
+                        <img src="https://nv-tlabs.github.io/3DStyleNet/assets/nvidia.svg" alt="NVIDIA Logo"
+                            style="width: auto; height: 30px;">
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <section class="description_noborder">
+            <div class="description-content">
+                <p style="margin-bottom: 20px; display: flex; align-items: flex-start;">
+                    <img src="asset/ps3_ikon.svg" width="50" height="50" style="flex-shrink: 0; margin-right: 25px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
+                    <span><strong><span style="color: #76b900;">PS3</span></strong> scales CLIP-style vision pre-training from 384 to <strong>4K resolution</strong> with a <strong>near-constant cost</strong>
+                    by prompt-aware selective encoding.</span>
+                </p>
+                <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
+                    <img src="asset/vilahd_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
+                    <span><strong><span style="color: #76b900;">VILA-HD</span></strong> is a frontier high-res MLLM built on top of PS3, achieving <strong>better performance</strong> and <strong>efficiency</strong> than Qwen2-VL
+                    on up to 4K-resolution images.</span>
+                </p>
+                <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
+                    <img src="asset/4kpro_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
+                    <span><strong><span style="color: #76b900;">4KPro</span></strong> is a benchmark that not only contains 4K-resolution images, but also <strong>strictly requires 4K-resolution perception</strong>.</span>
+                </p>
+            </div>
+        </section>
+
+        <a href="https://arxiv.org/abs/2503.19903" class="button" target="_blank">
+            <span class="icon">
+                <i class="ai ai-arxiv"></i>
+            </span>
+            <span>Paper</span>
+        </a>
+
+        <a href="https://github.com/NVLabs/PS3/" class="button" target="_blank">
+            <span class="icon">
+                <i class="fab fa-github"></i>
+            </span>
+            <span>PS3 Code</span>
+        </a>
+
+        <a href="#" class="button" target="_blank">
+            <span class="icon">
+                <i class="fab fa-github"></i>
+            </span>
+            <span>VILA-HD Code (Coming Soon)</span>
+        </a>
+
+        <a href="#" class="button" target="_blank">
+            <span class="icon">
+                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
+            </span>
+            <span>PS3 Weights (Coming Soon)</span>
+        </a>
+
+        <a href="#" class="button" target="_blank">
+            <span class="icon">
+                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
+            </span>
+            <span>VILA-HD Weights (Coming Soon)</span>
+        </a>
+
+        <a href="#" class="button" target="_blank">
+            <span class="icon">
+                <i class="fas fa-tasks"></i>
+            </span>
+            <span>4KPro Benchmark (Coming Soon)</span>
+        </a>
+
+        <a href="#" class="button" target="_blank">
+            <span class="icon">
+                <i class="fas fa-quote-right"></i>
+            </span>
+            <span>Citation</span>
+        </a>
+        
+        
+
+    </div>
+
+
+    <!-- <div class="gallery-container">
+        <section class="gallery" id="gallery">
+            <div class="gallery-item item1">
+                <img src="asset/teaser.jpg" alt="Image 1" data-description='Overview of NVILA Results'>
+            </div>
+        </section>
+    </div> -->
+
+    <script>
+        let slideIndex = 1;
+        showSlides(slideIndex);
+
+        // Next/previous controls
+        function plusSlides(n) {
+            showSlides(slideIndex += n);
+        }
+
+        // Thumbnail image controls
+        function currentSlide(n) {
+            showSlides(slideIndex = n);
+        }
+
+        function showSlides(n) {
+            let i;
+            let slides = document.getElementsByClassName("mySlides");
+            let dots = document.getElementsByClassName("demo");
+            if (n > slides.length) { slideIndex = 1 }
+            if (n < 1) { slideIndex = slides.length }
+            for (i = 0; i < slides.length; i++) {
+                slides[i].style.display = "none";
+            }
+            for (i = 0; i < dots.length; i++) {
+                dots[i].className = dots[i].className.replace(" active", "");
+            }
+            slides[slideIndex - 1].style.display = "block";
+            dots[slideIndex - 1].className += " active";
+        }
+
+    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Position the image container (needed to position the left and right arrows) */
+        .container {
+            position: relative;
+        }
+
+        /* Hide the images by default */
+        .mySlides {
+            display: none;
+        }
+
+        /* Add a pointer when hovering over the thumbnail images */
+        .cursor {
+            cursor: pointer;
+            width: 100%;
+            /* height: 50pt; */
+            object-fit: contain;
+        }
+
+        /* Next & previous buttons */
+        .prev,
+        .next {
+            cursor: pointer;
+            position: absolute;
+            /* top: 40%; */
+            top: 110pt;
+            width: auto;
+            padding: 16px;
+            margin-top: -50px;
+            color: white;
+            background-color: #00000030;
+            font-weight: bold;
+            font-size: 20px;
+            border-radius: 0 3px 3px 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .prev {
+            left: 0;
+            border-radius: 3px 0 0 3px;
+        }
+
+        .next {
+            right: 0;
+            border-radius: 0 3px 3px 0;
+        }
+
+        /* Position the "next button" to the right */
+        .next {
+            right: 0;
+            border-radius: 3px 0 0 3px;
+        }
+
+        /* On hover, add a black background color with a little bit see-through */
+        .prev:hover,
+        .next:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Number text (1/3 etc) */
+        .numbertext {
+            color: #000000;
+            background-color: white;
+            opacity: 0.3;
+            font-size: 12px;
+            padding: 8px 12px;
+            position: absolute;
+            top: 0;
+        }
+
+        .row:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+        /* Six columns side by side */
+        .column-gallery {
+            float: left;
+            width: 16.66%;
+        }
+
+        /* Add a transparency effect for thumnbail images */
+        .demo {
+            border: #000000;
+            /* border-radius: 15px; */
+            color: #00000030;
+            opacity: 0.3;
+        }
+
+        .active,
+        .demo:hover {
+            opacity: 1;
+        }
+    </style>
+
+    <!-- The Modal -->
+    <div id="modal" onclick="this.style.display='none'">
+        <img id="modal-img" src="">
+        <div id="modal-description"></div> <!-- Text for description -->
+    </div>
+
+    
+
+    <section class="description">
+    </section>
+
+    <section class="description_noborder">
+        <!-- Container for the image gallery -->
+        <!-- <div class="container" style="width: 80%; margin:auto">
+            <div class="mySlides" style="display: block;">
+                <div class="numbertext gallery-item">1 / 5</div>
+                <img src="asset/example.jpg" style="width:100%" class="inserted-image">
+            </div>
+
+            <div class="mySlides">
+                <div class="numbertext gallery-item">2 / 5</div>
+                <img src="asset/example_vqa.jpg" style="width:100%" class="inserted-image">
+            </div>
+
+            <div class="mySlides">
+                <div class="numbertext gallery-item">3 / 5</div>
+                <img src="asset/example_meme.jpg" style="width:100%" class="inserted-image">
+            </div>
+
+            <div class="mySlides">
+                <div class="numbertext gallery-item">4 / 5</div>
+                <img src="asset/example_video.jpg" style="width:100%" class="inserted-image">
+            </div>
+
+            <div class="mySlides">
+                <div class="numbertext gallery-item">5 / 5</div>
+                <img src="asset/more_examples.jpg" style="width:100%" class="inserted-image">
+            </div>
+
+            <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
+            <a class="next" onclick="plusSlides(1)">&#10095;</a>
+
+            <br>
+            <div class="row">
+                <div class="column column-gallery" x>
+                    <img class="demo cursor" src="asset/example.jpg" style="width:100%" onclick="currentSlide(1)">
+                </div>
+                <div class="column column-gallery">
+                    <img class="demo cursor" src="asset/example_vqa.jpg" style="width:100%" onclick="currentSlide(2)">
+                </div>
+                <div class="column column-gallery">
+                    <img class="demo cursor" src="asset/example_meme.jpg" style="width:100%" onclick="currentSlide(3)">
+                </div>
+                <div class="column column-gallery">
+                    <img class="demo cursor" src="asset/example_video.jpg" style="width:100%" onclick="currentSlide(4)">
+                </div>
+                <div class="column column-gallery">
+                    <img class="demo cursor" src="asset/more_examples.jpg" style="width:100%" onclick="currentSlide(5)">
+                </div>
+            </div>
+        </div> -->
+
+
+
+        <!-- PS3 Part -->
+
+        <div class="description-content">
+            <h1>PS3: Vision Pre-Training at 4K Resolution</h1>
+        </div>
+
+        <div class="description-content">
+            <h2>Why 4K Resolution?</h2>
+            <p>
+                Previous vision models (e.g., <a href="https://arxiv.org/abs/2103.00020" target="_blank" class="reference-link">CLIP</a>, <a href="https://arxiv.org/abs/2303.15343" target="_blank" class="reference-link">SigLIP</a>) are all pre-trained at low resolution such as 384x384.
+                However, in real-world applications, we often need to process high-resolution images such as 4K resolution. 
+                Below shows an example where 4K resolution is required to recognize the stop sign while driving.
+            </p>
+
+            <h2>Why Pre-Train at 4K Resolution?</h2>
+            <p>
+                Although previous methods such as <a href="https://arxiv.org/abs/2403.13043" target="_blank" class="reference-link">S<sup>2</sup></a> and <a href="https://llava-vl.github.io/blog/2024-01-30-llava-next/" target="_blank" class="reference-link">AnyRes</a> can process high-res images without high-res pre-training, 
+                we find that pre-training on high-res images improves the performance because it can utilize the large-scale pre-training data to learn high-quality high-res features.
+                Below we can see that <strong><span style="color: #f4b263;">PS3</span></strong>, pre-trained at 4K resolution, clearly improves over baselines like <strong><span style="color: #c3dfd4;">S<sup>2</sup></span></strong> and <strong><span style="color: #6a926a;">AnyRes</span></strong>.
+            </p>
+            <img src="asset/motivation.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+        <div class="description-content">
+            <h2>Why We Can Do It But Previous Methods Can't?</h2>
+            <p>
+                Previous vision pre-training like <a href="https://arxiv.org/abs/2103.00020" target="_blank" class="reference-link">CLIP</a> and <a href="https://arxiv.org/abs/2303.15343" target="_blank" class="reference-link">SigLIP</a> can't scale to high resolution because it's too expensive. 
+                The vision model needs to encode the whole image which is at least quadratic in compute.
+                However, for high-res images, you usually don't need to look at the whole image.
+                For example, in the figure above, you only need to look at the stop sign to answer that question.
+                This means, instead of doing contrastive learning on the whole image, it's enough to <strong>contrast between local regions and local captions</strong>.
+                In this way, the model can still learn detailed representations of high-res images but with nearly no extra cost.
+            </p>
+            <img src="asset/local_contrast.png" alt="local region" class="inserted-image-noshadow">
+        </div>
+
+        <div class="description-content">
+            <h2>Key Design: Localized High-Res Encoding via Top-Down Selection</h2>
+            <p>
+                The key to PS3's success is the ability to selectively process high-res regions based on any text prompt.
+                This is achieved by a <strong>top-down (i.e., prompt-aware) selection mechanism</strong> that allows the model to focus on the most relevant regions for any given text prompt and 
+                encode both the low-res global image and the high-res local region.
+            </p>
+            <img src="asset/ps3.png" alt="local region" class="inserted-image-noshadow">
+            <img src="asset/qualitative_patch_selection.png" alt="local region" class="inserted-image-noshadow">
+        </div>
+
+
+
+
+        <!-- VILA-HD Part -->
+
+        <br>
+        <div class="description-content">
+            <h1>VILA-HD: Enabling Efficient and Performant<br>4K-Resolution MLLM with PS3</h1>
+        </div>
+
+        <div class="description-content">
+            <h2>Building VILA-HD with PS3</h2>
+            <p>
+                We build VILA-HD, a high-res MLLM with PS3 as the vision encoder that can efficeintly process up to 4K x 4K resolution.
+                VILA-HD efficiently processes high-res images by first taking the low-res features from PS3 and text tokens and then selectively processing the high-res regions that are relevant to the text prompt using PS3.
+                One can flexibly decide how many high-res patches to process in VILA-HD based on the compute budget.
+            </p>
+
+            <img src="asset/vila-hd.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+        <div class="description-content">
+            <h2>Superior Scaling Properties</h2>
+            <p>
+                VILA-HD with PS3 shows intriguing scaling properties.
+                <strong>(a)</strong> When scaling up the resolution and selecting all the patches for each resolution, VILA-HD with PS3 shows better scaling curve than baselines without high-res pre-training.
+                <strong>(b)</strong> VILA-HD with PS3 can scale up resolution and improve performance without extra training and inference cost by selecting a constant number of patches.
+                <strong>(c, d)</strong> VILA-HD with PS3 can scale up training or test-time compute by selecting more patches in trade of better performance.
+            </p>
+
+            <img src="asset/scaling_curve.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+        <div class="description-content">
+            <h2>SOTA Performance and Efficiency</h2>
+            <p>
+                Compared to state-of-the-art MLLMs such as <a href="https://arxiv.org/abs/2412.04468" target="_blank" class="reference-link">NVILA</a> and <a href="https://arxiv.org/abs/2409.12191" target="_blank" class="reference-link">Qwen2-VL</a>, VILA-HD achieves competitive performance across all the benchmarks including Chart, Doc, OCR, and natural image understanding, 
+                and sets new SOTA result on benchmarks that require high-res perception such as <a href="https://arxiv.org/abs/2312.14135" target="_blank" class="reference-link">V<sup>*</sup>Bench</a>.
+            </p>
+
+            <img src="asset/sota_mllm.png" alt="motivation" class="inserted-image-noshadow">
+
+            <p>
+                VILA-HD also achieves best efficiency compared to previous token pruning approaches, thanks to the top-down patch selection mechanism of PS3. 
+                Specifically, when selecting the same number of tokens, PS3 significantly improves ViT efficiency while achieving better performance. 
+                PS3 is also the only approach that's able to process 4K resolution.
+            </p>
+
+            <img src="asset/sota_efficiency.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+        
+
+
+        <!-- 4KPro Part -->
+
+        <br>
+        <div class="description-content">
+            <h1>4KPro: Benchmarking 4K-Resolution Perception</h1>
+        </div>
+
+        <div class="description-content">
+            <h2>Previous Benchmarks Do Not Need 4K-Resolution Perception</h2>
+            <p>
+                Although previous image QA benchmarks consist of up to 4k resolution images, the questions in those benchmarks do not really need 4k resolution perception to answer.
+                Specifically, we manually check the minimum recognizable resolution (MRR), i.e., the minimum resolution required to answer the question, of each question in the benchmarks.
+                We find that most questions can be answered with no more than 1K resolution.
+            </p>
+
+            <img src="asset/mrr.png" alt="motivation" class="inserted-image-noshadow-small">
+        </div>
+
+        <div class="description-content">
+            <h2>4KPro Strictly Requires 4K-Resolution Perception</h2>
+            <p>
+                To this end, we propose 4KPro, a new benchmark that strictly requires 4K-Resolution Perception.
+                4KPro consists of 4K-resolution QA tasks in four professional domains, including autonomous driving, household, gaming, and UI understanding.
+            </p>
+
+            <img src="asset/qualitative_4kpro.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+        <div class="description-content">
+            <h2>VILA-HD achieves SOTA Performance and Efficiency on 4KPro</h2>
+            <p>
+                VILA-HD with PS3 show better scaling curves than baselines without high-res pre-training.
+                VILA-HD also achieves SOTA performance and better efficiency than previous MLLMs including <a href="https://arxiv.org/abs/2409.12191" target="_blank" class="reference-link">Qwen2-VL</a>.
+            </p>
+            <img src="asset/sota_4kpro.png" alt="motivation" class="inserted-image-noshadow">
+        </div>
+
+
+
+
+        <!--BibTex citation -->
+        <!-- <div id="bibtex" class="description-content">
+            <h2 class="title">
+                BibTeX
+                <button onclick="copyToClipboard()" > click to copy</button>
+            </h2>
+        </div>
+        <section class="citation" id="BibTeX">
+            <div class="citation-content">
+                <pre><code>@misc{liu2024nvila,
+      title={NVILA: Efficient Frontier Visual Language Models}, 
+      author={Zhijian Liu and Ligeng Zhu and Baifeng Shi and Zhuoyang Zhang and Yuming Lou and Shang Yang and Haocheng Xi and Shiyi Cao and Yuxian Gu and Dacheng Li and Xiuyu Li and Yunhao Fang and Yukang Chen and Cheng-Yu Hsieh and De-An Huang and An-Chieh Cheng and Vishwesh Nath and Jinyi Hu and Sifei Liu and Ranjay Krishna and Daguang Xu and Xiaolong Wang and Pavlo Molchanov and Jan Kautz and Hongxu Yin and Song Han and Yao Lu},
+      year={2024},
+      eprint={2412.04468},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2412.04468}, 
+}</code></pre>
+            </div>
+        </section>
+        <script>
+            function copyToClipboard() {
+                const bibtexContent = document.querySelector('#BibTeX pre code').textContent;
+                navigator.clipboard.writeText(bibtexContent).then(() => {
+                    alert("NVILA's BibTeX content copied to clipboard!");
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            }
+        </script> -->
+
+       
+
+    </section>
+    <!--End BibTex citation -->
+
+    <!-- <script defer src="https://busuanzi.9420.ltd/js"></script>
+
+本文总阅读量 <span id="busuanzi_page_pv"></span> 次
+本文总访客量 <span id="busuanzi_page_uv"></span> 人
+本站总访问量 <span id="busuanzi_site_pv"></span> 次
+本站总访客数 <span id="busuanzi_site_uv"></span> 人 -->
+    <!-- Footer Section -->
+    <footer class="footer">
+        <div class="container">
+            <div class="columns tered">
+                <div class="column is-8">
+                    <div class="content">
+                        <!-- <p>
+                            This website is licensed under a <a rel="license"
+                                href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+                                Commons Attribution-ShareAlike 4.0 International License</a>.
+                        </p>
+                        <p>Total clicks:
+                            <span id="busuanzi_page_pv"></span>
+                        </p>
+                        </p> -->
+                        <p>
+                            We thank <a
+                                href="https://nvlabs.github.io/VILA/" target="_blank">NVILA</a> for the project page template.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <!-- End Footer -->
+
+    <script>
+        // Function to open the modal and display the clicked image and description
+        function openModal(img) {
+            var modal = document.getElementById("modal");
+            var modalImg = document.getElementById("modal-img");
+            var modalDescription = document.getElementById("modal-description");
+
+            modal.style.display = "flex";
+            modalImg.src = img.src;
+            modalDescription.textContent = img.getAttribute('data-description'); // Get description from data-description attribute
+        }
+
+        // Add click event listeners to all images in the gallery with their descriptions
+        const images = document.querySelectorAll('.gallery-item img');
+        images.forEach((img) => {
+            img.addEventListener('click', () => openModal(img));
+        });
+    </script>
+
+    <script>
+        const container = document.querySelector('.image-comparison-content');
+        const slider = document.querySelector('.slider');
+        // const slider_black = document.querySelector('.slider-black');
+        const image2 = document.querySelector('.image-2');
+        // const image4 = document.querySelector('.image-4');
+
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            let xPos = e.clientX - rect.left;
+
+            if (xPos < 0) xPos = 0;
+            if (xPos > rect.width) xPos = rect.width;
+
+            const percentage = (xPos / rect.width) * 100;
+
+            slider.style.left = `${percentage}%`;
+            // slider_black.style.left = `${percentage}%`;
+            image2.style.clipPath = `inset(0 0 0 ${percentage}%)`;
+            // image4.style.clipPath = `inset(0 0 0 ${percentage}%)`;
+        });
+    </script>
+</body>
+
+</html>
