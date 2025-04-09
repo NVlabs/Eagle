@@ -9,7 +9,7 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scaling Vision Pre-Training to 4K Resolution</title>
+    <title>Eagle 2.5: Boosting Long-Context Post-Training for Frontier Vision-Language Models</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
     <style>
@@ -269,6 +269,12 @@
             text-align: left;
             /* Left-align the p */
             font-weight: normal;
+        }
+
+        .description-content ul, .description-content li {
+            text-align: left;
+            margin-left: 0;
+            padding-left: 20px;
         }
 
         .citation {
@@ -697,14 +703,32 @@
     <!--    </div>-->
     <div class="hero">
         <h1>
-            Eagle 2.5: Boosting Long-Context Post-Training for Frontier Vision-Language Models
+            Eagle 2.5: Boosting Long-Context Post-Training </br> for Frontier Vision-Language Models
         </h1>
-
+<!-- Wonmin Byeon, Matthieu Le, Max Ehrlich, Tong Lu1, Limin Wang1, Bryan Catanzaro, Jan Kautz, Andrew Tao,
+Zhiding Yu†, Guilin Liu† -->
         <!-- Add author and institution information -->
         <div style="margin-top: 30px; text-align: center;">
             <p style="font-size: 1.4em; margin-bottom: 5px; width: 80%; margin: auto">
                 <a href="https://cg1177.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Guo Chen</a><sup style="font-size: 0.6em;">1,2</sup>&nbsp;&nbsp;&nbsp;
                 <a href="https://zhiqi-li.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Zhiqi Li</a><sup style="font-size: 0.6em;">1,2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=7TWugs4AAAAJ" target="_blank" style="color: #6f6f6f; text-decoration: none;">Shihao Wang</a><sup style="font-size: 0.6em;">1,3</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=6oo8xOQAAAAJ" target="_blank" style="color: #6f6f6f; text-decoration: none;">Jindong Jiang</a><sup style="font-size: 0.6em;">1,4</sup>&nbsp;&nbsp;&nbsp;
+                <a href="" target="_blank" style="color: #6f6f6f; text-decoration: none;">Yicheng Liu</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="" target="_blank" style="color: #6f6f6f; text-decoration: none;">Lidong Lu</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://ai.stanford.edu/~dahuang/" target="_blank" style="color: #6f6f6f; text-decoration: none;">De-An Huang</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <br>
+                <a href="https://wonmin-byeon.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Wonmin Byeon</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://zhiqi-li.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Matthieu Le</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://maxlikelihood.ai/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Max Ehrlich</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://cs.nju.edu.cn/lutong/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Tong Lu</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://wanglimin.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Limin Wang</a><sup style="font-size: 0.6em;">2</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=UZ6kI2AAAAAJ" target="_blank" style="color: #6f6f6f; text-decoration: none;">Bryan Catanzaro</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=P9FclNEAAAAJ" target="_blank" style="color: #6f6f6f; text-decoration: none;">Jan Kautz</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://scholar.google.com/citations?user=Wel9l1wAAAAJ" target="_blank" style="color: #6f6f6f; text-decoration: none;">Andrew Tao</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <br>
+                <a href="https://chrisding.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Zhiding Yu</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp;
+                <a href="https://liuguilin1225.github.io/" target="_blank" style="color: #6f6f6f; text-decoration: none;">Guilin Liu</a><sup style="font-size: 0.6em;">1</sup>&nbsp;&nbsp;&nbsp; 
             </p>
             <!-- <p style="font-size: 1.2em; color: #888;">
                 <sup>1</sup>UC Berkeley
@@ -717,16 +741,30 @@
             <div class="logo" style="padding-top: 30px; padding-bottom: 0px;">
                 <div style="position: relative; display: inline-block;">
                     <sup style="position: absolute; left: -10px; top: 0;">1</sup>
-                    <a href="https://www.berkeley.edu/" style="text-decoration: none; font-size: 16px;">
-                        <img src="asset/University_of_California,_Berkeley.png" alt="Berkeley Logo"
-                            style="width: auto; height: 40px;">
+                    <a href="https://www.nvidia.com/" style="text-decoration: none; font-size: 16px;">
+                        <img src="https://nv-tlabs.github.io/3DStyleNet/assets/nvidia.svg" alt="NVIDIA Logo"
+                            style="width: auto; height: 30px;">
                     </a>
                 </div>
                 <div style="position: relative; display: inline-block;">
                     <sup style="position: absolute; left: -10px; top: -5px;">2</sup>
-                    <a href="https://www.nvidia.com/" style="text-decoration: none; font-size: 16px;">
-                        <img src="https://nv-tlabs.github.io/3DStyleNet/assets/nvidia.svg" alt="NVIDIA Logo"
-                            style="width: auto; height: 30px;">
+                    <a href="https://www.nju.edu.cn/index.htm" style="text-decoration: none; font-size: 16px;">
+                        <img src="https://www.nju.edu.cn/__local/F/7A/1D/91723945F34FAA0A9C67700CF8F_13B47AE2_E3A7.png" alt="Berkeley Logo"
+                            style="width: auto; height: 40px;">
+                    </a>
+                </div>
+                <div style="position: relative; display: inline-block;">
+                    <sup style="position: absolute; left: -10px; top: -5px;">3</sup>
+                    <a href="https://www.polyu.edu.hk/tc/" style="text-decoration: none; font-size: 16px;">
+                        <img src="https://www.polyu.edu.hk/assets/img/main-logo-3x.png" alt="Berkeley Logo"
+                            style="width: auto; height: 40px;">
+                    </a>
+                </div>
+                <div style="position: relative; display: inline-block;"> 
+                    <sup style="position: absolute; left: -10px; top: -5px;">4</sup>
+                    <a href="https://www.rutgers.edu/" style="text-decoration: none; font-size: 16px;">
+                        <img src="https://1000logos.net/wp-content/uploads/2017/08/Logo-Rutgers-University.jpg" alt="Berkeley Logo"
+                            style="width: auto; height: 40px;">
                     </a>
                 </div>
             </div>
@@ -736,61 +774,51 @@
             <div class="description-content">
                 <p style="margin-bottom: 20px; display: flex; align-items: flex-start;">
                     <img src="asset/ps3_ikon.svg" width="50" height="50" style="flex-shrink: 0; margin-right: 25px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
-                    <span><strong><span style="color: #76b900;">PS3</span></strong> scales CLIP-style vision pre-training from 384 to <strong>4K resolution</strong> with a <strong>near-constant cost</strong>
-                    by prompt-aware selective encoding.</span>
+                    <span><strong><span style="color: #76b900;">Eagle 2.5</span></strong> is a versatile multimodal model designed to efficiently process <strong>extensive contextual information</strong> with consistent performance scaling as input length increases.</span>
                 </p>
                 <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
                     <img src="asset/vilahd_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
-                    <span><strong><span style="color: #76b900;">VILA-HD</span></strong> is a frontier high-res MLLM built on top of PS3, achieving <strong>better performance</strong> and <strong>efficiency</strong> than Qwen2-VL
-                    on up to 4K-resolution images.</span>
+                    <span><strong><span style="color: #76b900;">Information-first sampling</span></strong> preserves essential visual and semantic information through <strong>Image Area Preservation</strong> and <strong>Automatic Degradation Sampling</strong>.</span>
                 </p>
                 <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
                     <img src="asset/4kpro_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
-                    <span><strong><span style="color: #76b900;">4KPro</span></strong> is a benchmark that not only contains 4K-resolution images, but also <strong>strictly requires 4K-resolution perception</strong>.</span>
+                    <span><strong><span style="color: #76b900;">Progressive training</span></strong> incrementally expands context length during training, enhancing the model's ability to process <strong>inputs of varying sizes</strong>.</span>
+                </p>
+                <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
+                    <img src="asset/4kpro_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
+                    <span><strong><span style="color: #76b900;">Eagle-Video-110K</span></strong> is a diverse video dataset with <strong>dual annotation approaches</strong> for comprehensive long-form understanding.</span>
                 </p>
             </div>
         </section>
 
-        <a href="https://arxiv.org/abs/2503.19903" class="button" target="_blank">
+        <a href="#" class="button" target="_blank">
             <span class="icon">
                 <i class="ai ai-arxiv"></i>
             </span>
             <span>Paper</span>
         </a>
 
-        <a href="https://github.com/NVLabs/PS3/" class="button" target="_blank">
+        <a href="https://github.com/NVlabs/EAGLE" class="button" target="_blank">
             <span class="icon">
                 <i class="fab fa-github"></i>
             </span>
-            <span>PS3 Code</span>
+            <span>Eagle Code</span>
         </a>
+
+
 
         <a href="#" class="button" target="_blank">
             <span class="icon">
-                <i class="fab fa-github"></i>
+                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
             </span>
-            <span>VILA-HD Code (Coming Soon)</span>
+            <span>Eagle-2.5 Weights (Coming Soon)</span>
         </a>
 
         <a href="#" class="button" target="_blank">
             <span class="icon">
                 <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
             </span>
-            <span>PS3 Weights (Coming Soon)</span>
-        </a>
-
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
-            </span>
-            <span>VILA-HD Weights (Coming Soon)</span>
-        </a>
-
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <i class="fas fa-tasks"></i>
-            </span>
-            <span>4KPro Benchmark (Coming Soon)</span>
+            <span>Eagle-Video-110K Data (Coming Soon)</span>
         </a>
 
         <a href="#" class="button" target="_blank">
@@ -1009,144 +1037,130 @@
 
 
 
-        <!-- PS3 Part -->
+        <!-- Eagle 2.5 Part -->
 
         <div class="description-content">
-            <h1>PS3: Vision Pre-Training at 4K Resolution</h1>
+            <h1>Long-Context Vision-Language Understanding</h1>
         </div>
 
         <div class="description-content">
-            <h2>Why 4K Resolution?</h2>
+            <h2>Why Long-Context Understanding?</h2>
             <p>
-                Previous vision models (e.g., <a href="https://arxiv.org/abs/2103.00020" target="_blank" class="reference-link">CLIP</a>, <a href="https://arxiv.org/abs/2303.15343" target="_blank" class="reference-link">SigLIP</a>) are all pre-trained at low resolution such as 384x384.
-                However, in real-world applications, we often need to process high-resolution images such as 4K resolution. 
-                Below shows an example where 4K resolution is required to recognize the stop sign while driving.
+                Despite significant advances in multimodal learning, many vision-language models (VLMs) remain focused on short-context tasks, with long-context understanding under-explored. This gap is particularly evident in both long video comprehension and high-resolution image/video understanding, where the processing of extended visual contexts remains an open challenge.
             </p>
 
-            <h2>Why Pre-Train at 4K Resolution?</h2>
+            <h2>Challenges in Long-Context VLMs</h2>
             <p>
-                Although previous methods such as <a href="https://arxiv.org/abs/2403.13043" target="_blank" class="reference-link">S<sup>2</sup></a> and <a href="https://llava-vl.github.io/blog/2024-01-30-llava-next/" target="_blank" class="reference-link">AnyRes</a> can process high-res images without high-res pre-training, 
-                we find that pre-training on high-res images improves the performance because it can utilize the large-scale pre-training data to learn high-quality high-res features.
-                Below we can see that <strong><span style="color: #f4b263;">PS3</span></strong>, pre-trained at 4K resolution, clearly improves over baselines like <strong><span style="color: #c3dfd4;">S<sup>2</sup></span></strong> and <strong><span style="color: #6a926a;">AnyRes</span></strong>.
+                The development of long-context VLMs is still in its early stages, hindered by fundamental challenges in dataset construction, architecture design, training strategies, and computation/memory bottlenecks. While prior studies have explored extending context length, key limitations remain: suboptimal performance compared to proprietary models, inconsistent improvements as visual input increases, and unclear optimal training strategies.
             </p>
-            <img src="asset/motivation.png" alt="motivation" class="inserted-image-noshadow">
+            <!-- <img src="asset/performance_plot.png" alt="Performance scaling with context length" class="inserted-image-noshadow"> -->
         </div>
 
         <div class="description-content">
-            <h2>Why We Can Do It But Previous Methods Can't?</h2>
+            <h1>Eagle 2.5: Consistent Performance Scaling</h2>
             <p>
-                Previous vision pre-training like <a href="https://arxiv.org/abs/2103.00020" target="_blank" class="reference-link">CLIP</a> and <a href="https://arxiv.org/abs/2303.15343" target="_blank" class="reference-link">SigLIP</a> can't scale to high resolution because it's too expensive. 
-                The vision model needs to encode the whole image which is at least quadratic in compute.
-                However, for high-res images, you usually don't need to look at the whole image.
-                For example, in the figure above, you only need to look at the stop sign to answer that question.
-                This means, instead of doing contrastive learning on the whole image, it's enough to <strong>contrast between local regions and local captions</strong>.
-                In this way, the model can still learn detailed representations of high-res images but with nearly no extra cost.
+                Unlike models solely optimized for handling long multimodal sequences without improving performance, Eagle 2.5 benefits from increased input length, leading to consistent performance gains besides merely accommodating longer inputs. Our model achieves superior context coverage and exhibits consistent performance scaling with increasing frame counts, attaining competitive results compared to larger models like GPT-4o and Qwen2.5-VL-72B while maintaining a significantly smaller parameter footprint.
             </p>
-            <img src="asset/local_contrast.png" alt="local region" class="inserted-image-noshadow">
+            <img src="asset/eagle_2_5_performance.png" alt="Eagle 2.5 scaling properties" class="inserted-image-noshadow">
         </div>
-
-        <div class="description-content">
-            <h2>Key Design: Localized High-Res Encoding via Top-Down Selection</h2>
-            <p>
-                The key to PS3's success is the ability to selectively process high-res regions based on any text prompt.
-                This is achieved by a <strong>top-down (i.e., prompt-aware) selection mechanism</strong> that allows the model to focus on the most relevant regions for any given text prompt and 
-                encode both the low-res global image and the high-res local region.
-            </p>
-            <img src="asset/ps3.png" alt="local region" class="inserted-image-noshadow">
-            <img src="asset/qualitative_patch_selection.png" alt="local region" class="inserted-image-noshadow">
-        </div>
-
-
-
 
         <!-- VILA-HD Part -->
 
         <br>
         <div class="description-content">
-            <h1>VILA-HD: Enabling Efficient and Performant<br>4K-Resolution MLLM with PS3</h1>
+            <h2>Model Architecture</h2>
+            <p>
+                We design Eagle-2.5 as a versatile multimodal system capable of efficiently processing long-context information, rather than a specialized model solely optimized for handling extended multimodal inputs.
+                To ensure adaptability and generalization across diverse tasks, we deliberately avoid incorporating tailored compression modules that might constrain the model's flexibility.
+                Following the architecture of LLaVA, we employ an MLP projection layer to align vision embeddings from SigLIP with the LLM representation space.
+                In this work, we utilize the Qwen2.5 series models. To effectively handle any-resolution images, we adopt the image tiling strategy, inspired by LLaVA-1.5 and InternVL.
+            </p>
+            <img src="asset/eagle_2_5_model.jpg" alt="model architecture" class="inserted-image-noshadow" style="width: 80%;">
+        </div>
+        
+        <div class="description-content">
+            <h2>Training Strategy</h2>
+            <p>
+                Our approach contains two key components to achieve effective long-context training: first, an information-first sampling strategy that establishes optimal sampling criteria; and second, a progressive training schedule based on this strategy, which directs the entire model training process.
+            </p>
+            <img src="asset/tiling_comparison.png" alt="motivation" class="inserted-image-noshadow">
+
+            <h3>Information-First Sampling</h3>
+            <p>
+                In multimodal training, the sampling of visual content is essential. Multi-image documents typically comprise dozens of pages with ultra-high-resolution images, while video content can vary drastically in length - from mere seconds to hours. To effectively manage this diversity, we present <strong>information-first sampling</strong> to promote information preservation from both visual and semantic dimensions.
+            </p>
+
+            <ul>
+                <li><strong>Image Area Preservation (IAP)</strong>: Traditional tiling methods divide an image of size W × H into a rigid grid of tiles. While effective for handling high-resolution inputs, these approaches often distort the original image geometry through improper aspect ratio handling. To address this, we propose an area-prioritized tiling strategy that optimizes two key objectives: area preservation and aspect ratio fidelity.</li>
+                <li><strong>Automatic Degradation Sampling (ADS)</strong>: VLMs require careful allocation of sequence length budgets between visual and textual inputs. We propose Automatic Degradation Sampling (ADS), an all-context-centric strategy that dynamically optimizes this balance. ADS employs a dual-phase degradation process: temporal degradation first optimizes the sampling of frames or pages, followed by tiling degradation that maximizes the use of available context.</li>
+            </ul>
+
+
+            <h3>Post-Training Schedule</h3>
+            <p>
+                We introduce a comprehensive post-training framework consisting of two complementary strategies:
+            </p>
+            <ul>
+                <li><strong>Mixed post-training</strong>: Our ADS method adaptively adjusts each training sample to the maximum sequence length, providing a frame-agnostic training paradigm. We implement a mixed training strategy with length-balanced packing to optimize performance uniformly across the entire spectrum of context lengths.</li>
+                <li><strong>Progressive mixed post-training</strong>: For scenarios with large maximum sequence length values, we propose a progressive mixed training methodology that gradually exposes the model to increasingly larger sequence lengths, systematically enhancing its capacity to process extended contexts.</li>
+            </ul>
+            <img src="asset/training_schedule.png" alt="motivation" class="inserted-image-noshadow">
         </div>
 
         <div class="description-content">
-            <h2>Building VILA-HD with PS3</h2>
+            <h2>SOTA Performance across Image and Video Understanding</h2>
             <p>
-                We build VILA-HD, a high-res MLLM with PS3 as the vision encoder that can efficeintly process up to 4K x 4K resolution.
-                VILA-HD efficiently processes high-res images by first taking the low-res features from PS3 and text tokens and then selectively processing the high-res regions that are relevant to the text prompt using PS3.
-                One can flexibly decide how many high-res patches to process in VILA-HD based on the compute budget.
+                Eagle 2.5 demonstrates exceptional performance across a wide range of image and video understanding benchmarks, achieving competitive results compared to both open-source and proprietary models with significantly larger parameter counts.
             </p>
 
-            <img src="asset/vila-hd.png" alt="motivation" class="inserted-image-noshadow">
-        </div>
-
-        <div class="description-content">
-            <h2>Superior Scaling Properties</h2>
+            <h3>Video Understanding</h3>
             <p>
-                VILA-HD with PS3 shows intriguing scaling properties.
-                <strong>(a)</strong> When scaling up the resolution and selecting all the patches for each resolution, VILA-HD with PS3 shows better scaling curve than baselines without high-res pre-training.
-                <strong>(b)</strong> VILA-HD with PS3 can scale up resolution and improve performance without extra training and inference cost by selecting a constant number of patches.
-                <strong>(c, d)</strong> VILA-HD with PS3 can scale up training or test-time compute by selecting more patches in trade of better performance.
+                Eagle2.5-8B shows remarkable capabilities on multiple video benchmarks, achieving 74.8 on MVBench, 82.0 on Perception_test, and 72.2 on EgoSchema, outperforming similar-sized models like InternVL2.5-8B (72.0) and Qwen2.5-VL-8B (69.6, 70.5, 65.0). It particularly excels in long-form video understanding with 77.6 on MLVU and 66.4 on LongVideobench, surpassing even InternVL2.5-78B (75.7, 63.6). On VideoMME (without subtitles), Eagle 2.5 achieves 72.4, coming extremely close to 72B parameter models while using far fewer parameters.
             </p>
 
-            <img src="asset/scaling_curve.png" alt="motivation" class="inserted-image-noshadow">
-        </div>
+            <img src="asset/video_sota.jpg" alt="motivation" class="inserted-image-noshadow">
 
-        <div class="description-content">
-            <h2>SOTA Performance and Efficiency</h2>
+            <h3>Image Understanding</h3>
             <p>
-                Compared to state-of-the-art MLLMs such as <a href="https://arxiv.org/abs/2412.04468" target="_blank" class="reference-link">NVILA</a> and <a href="https://arxiv.org/abs/2409.12191" target="_blank" class="reference-link">Qwen2-VL</a>, VILA-HD achieves competitive performance across all the benchmarks including Chart, Doc, OCR, and natural image understanding, 
-                and sets new SOTA result on benchmarks that require high-res perception such as <a href="https://arxiv.org/abs/2312.14135" target="_blank" class="reference-link">V<sup>*</sup>Bench</a>.
+                Eagle2.5-8B demonstrates versatile image understanding across document comprehension (94.1 on DocVQA, 87.5 on ChartQA), information extraction (80.4 on InfoVQA, 83.7 on TextVQA), and optical character recognition (869 on OCRBench). The model also shows balanced capabilities in general perception and reasoning tasks (66.2 on MMstar, 76.7 on RWQA, 81.7 on MMB₁.₁), domain-specific knowledge (55.8 on MMMU, 84.5 on AI2D), visual hallucination assessment (54.7 on HallB), and even mathematical reasoning (67.8 on MathVista).
             </p>
 
-            <img src="asset/sota_mllm.png" alt="motivation" class="inserted-image-noshadow">
-
-            <p>
-                VILA-HD also achieves best efficiency compared to previous token pruning approaches, thanks to the top-down patch selection mechanism of PS3. 
-                Specifically, when selecting the same number of tokens, PS3 significantly improves ViT efficiency while achieving better performance. 
-                PS3 is also the only approach that's able to process 4K resolution.
-            </p>
-
-            <img src="asset/sota_efficiency.png" alt="motivation" class="inserted-image-noshadow">
+            <img src="asset/image_sota.jpg" alt="motivation" class="inserted-image-noshadow">
         </div>
 
         
 
 
-        <!-- 4KPro Part -->
+        <!-- Eagle-Video-110K Part -->
 
         <br>
         <div class="description-content">
-            <h1>4KPro: Benchmarking 4K-Resolution Perception</h1>
+            <h1>Eagle-Video-110K: A Diverse Video Dataset for Long-Context Understanding</h1>
         </div>
 
         <div class="description-content">
-            <h2>Previous Benchmarks Do Not Need 4K-Resolution Perception</h2>
+            <h2>Addressing Insufficient Video Length in Existing Datasets</h2>
             <p>
-                Although previous image QA benchmarks consist of up to 4k resolution images, the questions in those benchmarks do not really need 4k resolution perception to answer.
-                Specifically, we manually check the minimum recognizable resolution (MRR), i.e., the minimum resolution required to answer the question, of each question in the benchmarks.
-                We find that most questions can be answered with no more than 1K resolution.
+                Existing video datasets often contain videos that are too short for comprehensive long-context understanding. Eagle-Video-110K addresses this limitation by curating a diverse collection of longer videos from multiple sources including Vidchapters, MiraData, InternVid-10M, Panda-70M, Vript, Shot2story, ViTT, and WebVid-10M. Using a diversity-driven strategy with CLIP embeddings and similarity thresholds, we identify and select novel videos that significantly extend the average duration available for training and evaluation.
             </p>
-
-            <img src="asset/mrr.png" alt="motivation" class="inserted-image-noshadow-small">
+            <img src="asset/video_duration_comparison_full.png" alt="Comparison of video lengths across datasets" class="inserted-image-noshadow">
         </div>
 
         <div class="description-content">
-            <h2>4KPro Strictly Requires 4K-Resolution Perception</h2>
+            <h2>Dual Annotation Pipeline for Comprehensive Understanding</h2>
             <p>
-                To this end, we propose 4KPro, a new benchmark that strictly requires 4K-Resolution Perception.
-                4KPro consists of 4K-resolution QA tasks in four professional domains, including autonomous driving, household, gaming, and UI understanding.
+                Eagle-Video-110K features a novel dual annotation pipeline that combines both top-down and bottom-up approaches for comprehensive video understanding. In the top-down approach, we leverage human-annotated chapters as semantically meaningful video segments, generating chapter-level dense captions with GPT-4o and long-form QA pairs with GPT-4. Simultaneously, our bottom-up approach focuses on localized spatiotemporal details by generating clip-level QA pairs enhanced with time interval references and textual context anchors. This hierarchical methodology enables both fine-grained temporal understanding and high-level semantic comprehension, creating a dataset that effectively supports long-context video reasoning.
             </p>
-
-            <img src="asset/qualitative_4kpro.png" alt="motivation" class="inserted-image-noshadow">
+            <img src="asset/annotation.png" alt="Dual annotation pipeline" class="inserted-image-noshadow">
         </div>
 
         <div class="description-content">
-            <h2>VILA-HD achieves SOTA Performance and Efficiency on 4KPro</h2>
+            <h2>Impact on Video Understanding Performance</h2>
             <p>
-                VILA-HD with PS3 show better scaling curves than baselines without high-res pre-training.
-                VILA-HD also achieves SOTA performance and better efficiency than previous MLLMs including <a href="https://arxiv.org/abs/2409.12191" target="_blank" class="reference-link">Qwen2-VL</a>.
+                Eagle-Video-110K significantly enhances model performance across both mainstream long and short video benchmarks. Most notably, it substantially improves the model's capability to handle high frame counts (≥128 frames) by providing training data with longer videos that were previously absent in open-source training sets. This improvement is particularly evident on the Video-MME benchmark, where Eagle 2.5 trained with Eagle-Video-110K demonstrates consistent performance scaling with increasing frame counts, unlike other models that plateau or degrade with longer inputs.
             </p>
-            <img src="asset/sota_4kpro.png" alt="motivation" class="inserted-image-noshadow">
+            <img src="asset/progressive_training_2.png" alt="Performance comparison on video understanding" class="inserted-image-noshadow">
         </div>
-
 
 
 
