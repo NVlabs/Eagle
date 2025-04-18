@@ -12,6 +12,9 @@
     <title>Eagle 2.5: Boosting Long-Context Post-Training for Frontier Vision-Language Models</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <!-- AOS Animation Library -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <style>
         :root {
             color-scheme: light;
@@ -65,18 +68,46 @@
         .button {
             display: inline-flex;
             align-items: center;
-            padding: 10px 20px;
-            margin: 5px;
-            font-size: 1.1em;
+            padding: 8px 16px;
+            margin: 6px;
+            font-size: 0.95em;
             color: white;
-            background-color: rgb(246, 172, 102);
-            border-radius: 30px;
+            background-color: #76b900;
+            border-radius: 8px;
             text-decoration: none;
-            transition: background-color 0.3s;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            font-weight: 500;
+        }
+
+        .button:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.4s;
+            z-index: -1;
         }
 
         .button:hover {
-            background-color: rgb(236, 162, 92);
+            background-color: #5f9700;
+            transform: translateY(-3px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.15);
+        }
+
+        .button:hover:before {
+            left: 100%;
+        }
+
+        .button:active {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
         }
 
         .button .icon {
@@ -121,14 +152,14 @@
             /* Cursor change on hover */
             border-radius: 20px;
             /* Rounded corners */
-            transition: transform 0.3s ease;
+            transition: transform 0.5s ease, box-shadow 0.5s ease;
             /* Add smooth transition */
         }
 
         /* Image scaling on hover */
         .gallery-item img:hover {
-            transform: scale(1.1);
-            /* Scale the image to 1.2 times its original size */
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
         }
 
         /* Define specific grid item placements */
@@ -221,8 +252,8 @@
         .description-content {
             /*background-color: rgba(255, 255, 255, 0.1); !* Semi-transparent background inside the section *!*/
             /*border: 2px solid #555; !* Adding a lighter border *!*/
-            max-width: 65%;
-            /* Limit the width to 80% of the screen */
+            max-width: 90%; /* Changed from 80% to 90% to make content wider */
+            /* Limit the width to 90% of the screen */
             margin: 0 auto;
             /* Center the content horizontally */
             padding: 20px;
@@ -293,8 +324,8 @@
             border-radius: 15px;
             /* Rounded corners */
             font-size: 0.8em;
-            max-width: 80%;
-            /* Limit the width to 80% of the screen */
+            max-width: 90%; /* Changed from 80% to 90% */
+            /* Limit the width to 90% of the screen */
             margin: 0 auto;
             /* Center the content horizontally */
             margin-top: -30px;
@@ -341,7 +372,7 @@
         }
 
         .inserted-image {
-            max-width: 80%;
+            max-width: 90%; /* Changed from 80% to 90% */
             /* Set the maximum width for the image */
             height: auto;
             /* Ensure the height adjusts automatically to maintain aspect ratio */
@@ -358,7 +389,7 @@
         }
 
         .inserted-image-noshadow {
-            max-width: 30%;
+            max-width: 70%; /* Changed from 50% to 70% to make images wider */
             /* Set the maximum width for the image */
             margin-left: auto;
             /* Center the image horizontally */
@@ -374,7 +405,7 @@
         }
 
         video {
-            max-width: 80%;
+            max-width: 90%; /* Changed from 80% to 90% */
             /* The video will scale to fit the container */
             height: auto;
             /* Maintain the video's aspect ratio */
@@ -502,44 +533,44 @@
 
         @media (min-width: 2048px) {
             .description-content {
-                max-width: 728px;
-                /* Limit the width to 80% of the screen */
+                max-width: 1024px; /* Changed from 728px to 1024px */
+                /* Limit the width to a fixed pixel value */
                 padding: 10px;
                 /* Padding inside the border */
             }
 
             .citation-content {
-                max-width: 728px;
-                /* Limit the width to 80% of the screen */
+                max-width: 1024px; /* Changed from 728px to 1024px */
+                /* Limit the width to a fixed pixel value */
                 padding: 10px;
                 /* Padding inside the border */
             }
 
             .inserted-image {
-                max-width: 1024px;
-                /* Limit the width to 80% of the screen */
+                max-width: 1280px; /* Changed from 1024px to 1280px */
+                /* Limit the width to a fixed pixel value */
                 padding: 10px;
                 /* Padding inside the border */
             }
 
             .inserted-image-noshadow {
-                max-width: 728px;
-                /* Limit the width to 80% of the screen */
+                max-width: 1024px; /* Changed from 728px to 1024px */
+                /* Limit the width to a fixed pixel value */
                 margin-left: auto;
                 /* Center the image horizontally */
                 margin-right: auto;
             }
 
             .inserted-image-noshadow-small {
-                max-width: 600px;
-                /* Limit the width to 80% of the screen */
+                max-width: 800px; /* Changed from 600px to 800px */
+                /* Limit the width to a fixed pixel value */
                 margin-left: auto;
                 /* Center the image horizontally */
                 margin-right: auto;
             }
 
             video {
-                max-width: 1024px;
+                max-width: 1280px; /* Changed from 1024px to 1280px */
                 /* The video will scale to fit the container */
             }
         }
@@ -560,38 +591,38 @@
 
         @media (min-width: 1024px) {
             .description-content {
-                max-width: 840px;
-                /* Limit the width to 80% of the screen */
+                max-width: 960px; /* Changed from 840px to 960px */
+                /* Limit the width to a fixed pixel value */
                 padding: 10px;
                 /* Padding inside the border */
             }
 
             .citation-content {
-                max-width: 768px;
-                /* Limit the width to 80% of the screen */
+                max-width: 960px; /* Changed from 768px to 960px */
+                /* Limit the width to a fixed pixel value */
                 padding: 10px;
                 /* Padding inside the border */
             }
 
             .inserted-image {
-                max-width: 826px;
-                /* Limit the width to 80% of the screen */
+                max-width: 960px; /* Changed from 826px to 960px */
+                /* Limit the width to a fixed pixel value */
                 padding: 5px;
                 /* Padding inside the border */
             }
 
             .inserted-image-noshadow {
-                max-width: 840px;
-                /* Limit the width to 80% of the screen */
-                max-height: 400px;
+                max-width: 960px; /* Changed from 840px to 960px */
+                /* Limit the width to a fixed pixel value */
+                max-height: 450px; /* Changed from 400px to 450px */
                 margin-left: auto;
                 /* Center the image horizontally */
                 margin-right: auto;
             }
 
             .inserted-image-noshadow-small {
-                max-width: 600px;
-                /* Limit the width to 80% of the screen */
+                max-width: 800px; /* Changed from 600px to 800px */
+                /* Limit the width to a fixed pixel value */
                 max-height: 300px;
                 margin-left: auto;
                 /* Center the image horizontally */
@@ -691,6 +722,115 @@
             color: inherit; /* Keeps the original text color */
             text-decoration: underline; /* Adds underline */
         }
+
+        /* Animation styles */
+        .fade-in {
+            opacity: 0;
+            transition: opacity 1.2s ease-in;
+        }
+        
+        .fade-in.appear {
+            opacity: 1;
+        }
+        
+        .from-left {
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: all 1s ease-in;
+        }
+        
+        .from-right {
+            transform: translateX(50%);
+            opacity: 0;
+            transition: all 1s ease-in;
+        }
+        
+        .from-left.appear, .from-right.appear {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        .scale-in {
+            transform: scale(0.8);
+            opacity: 0;
+            transition: all 0.8s ease-out;
+        }
+        
+        .scale-in.appear {
+            transform: scale(1);
+            opacity: 1;
+        }
+        
+        /* Animated highlight for key features */
+        .highlight-box {
+            position: relative;
+        }
+        
+        .highlight-box:after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #76b900;
+            transition: width 0.5s ease;
+        }
+        
+        .highlight-box:hover:after {
+            width: 100%;
+        }
+        
+        /* Pulse animation for key elements */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        /* Add this new section for author name animations */
+        .hero p a {
+            position: relative;
+            color: #555;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            padding: 2px 0;
+        }
+
+        .hero p a:after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: 0;
+            left: 0;
+            background-color: #76b900;
+            transition: width 0.3s ease;
+        }
+
+        .hero p a:hover {
+            color: #76b900;
+        }
+
+        .hero p a:hover:after {
+            width: 100%;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero p a {
+            display: inline-block;
+            animation: fadeIn 0.8s ease forwards;
+            animation-delay: calc(var(--index, 0) * 0.1s);
+            opacity: 0;
+        }
     </style>
 </head>
 
@@ -702,7 +842,7 @@
     <!--      </div>-->
     <!--    </div>-->
     <div class="hero">
-        <h1>
+        <h1 data-aos="fade-down" data-aos-duration="1000">
             Eagle 2.5: Boosting Long-Context Post-Training </br> for Frontier Vision-Language Models
         </h1>
 <!-- Wonmin Byeon, Matthieu Le, Max Ehrlich, Tong Lu1, Limin Wang1, Bryan Catanzaro, Jan Kautz, Andrew Tao,
@@ -771,10 +911,10 @@ Zhiding Yu†, Guilin Liu† -->
         </div>
 
         <section class="description_noborder">
-            <div class="description-content">
+            <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
                 <p style="margin-bottom: 20px; display: flex; align-items: flex-start;">
-                    <img src="asset/ps3_ikon.svg" width="50" height="50" style="flex-shrink: 0; margin-right: 25px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
-                    <span><strong><span style="color: #76b900;">Eagle 2.5</span></strong> is a versatile multimodal model designed to efficiently process <strong>extensive contextual information</strong> with consistent performance scaling as input length increases.</span>
+                    <img src="asset/ps3_ikon.svg" width="50" height="50" style="flex-shrink: 0; margin-right: 25px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);" class="pulse-animation">
+                    <span><strong><span style="color: #76b900;" class="highlight-box">Eagle 2.5</span></strong> is a versatile multimodal model designed to efficiently process <strong>extensive contextual information</strong> with consistent performance scaling as input length increases.</span>
                 </p>
                 <p style="margin-bottom: 20px; margin-left: 5px; display: flex; align-items: flex-start;">
                     <img src="asset/vilahd_ikon.svg" width="40" height="40" style="flex-shrink: 0; margin-right: 30px; margin-top: 4px; filter: invert(55%) sepia(96%) saturate(1747%) hue-rotate(42deg) brightness(97%) contrast(106%);">
@@ -791,43 +931,45 @@ Zhiding Yu†, Guilin Liu† -->
             </div>
         </section>
 
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <i class="ai ai-arxiv"></i>
-            </span>
-            <span>Paper</span>
-        </a>
-
-        <a href="https://github.com/NVlabs/EAGLE" class="button" target="_blank">
-            <span class="icon">
-                <i class="fab fa-github"></i>
-            </span>
-            <span>Eagle Code</span>
-        </a>
-
-
-
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
-            </span>
-            <span>Eagle-2.5 Weights (Coming Soon)</span>
-        </a>
-
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
-            </span>
-            <span>Eagle-Video-110K Data (Coming Soon)</span>
-        </a>
-
-        <a href="#" class="button" target="_blank">
-            <span class="icon">
-                <i class="fas fa-quote-right"></i>
-            </span>
-            <span>Citation</span>
-        </a>
+        <div data-aos="fade-up" data-aos-delay="300" data-aos-duration="800">
+            <a href="#" class="button" target="_blank">
+                <span class="icon">
+                    <i class="ai ai-arxiv"></i>
+                </span>
+                <span>Paper</span>
+            </a>
         
+
+            <a href="https://github.com/NVlabs/EAGLE" class="button" target="_blank">
+                <span class="icon">
+                    <i class="fab fa-github"></i>
+                </span>
+                <span>Eagle Code</span>
+            </a>
+
+            <a href="#" class="button" target="_blank">
+                <span class="icon">
+                    <i class="fas fa-quote-right"></i>
+                </span>
+                <span>Citation</span>
+            </a>
+
+            <a href="#" class="button" target="_blank">
+                <span class="icon">
+                    <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
+                </span>
+                <span>Eagle-2.5 Weights (Coming Soon)</span>
+            </a>
+
+            <a href="#" class="button" target="_blank">
+                <span class="icon">
+                    <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face logo">
+                </span>
+                <span>Eagle-Video-110K (Coming Soon)</span>
+            </a>
+
+            
+        </div>
         
 
     </div>
@@ -1039,11 +1181,11 @@ Zhiding Yu†, Guilin Liu† -->
 
         <!-- Eagle 2.5 Part -->
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h1>Long-Context Vision-Language Understanding</h1>
         </div>
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Why Long-Context Understanding?</h2>
             <p>
                 Despite significant advances in multimodal learning, many vision-language models (VLMs) remain focused on short-context tasks, with long-context understanding under-explored. This gap is particularly evident in both long video comprehension and high-resolution image/video understanding, where the processing of extended visual contexts remains an open challenge.
@@ -1056,18 +1198,18 @@ Zhiding Yu†, Guilin Liu† -->
             <!-- <img src="asset/performance_plot.png" alt="Performance scaling with context length" class="inserted-image-noshadow"> -->
         </div>
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h1>Eagle 2.5: Consistent Performance Scaling</h2>
             <p>
                 Unlike models solely optimized for handling long multimodal sequences without improving performance, Eagle 2.5 benefits from increased input length, leading to consistent performance gains besides merely accommodating longer inputs. Our model achieves superior context coverage and exhibits consistent performance scaling with increasing frame counts, attaining competitive results compared to larger models like GPT-4o and Qwen2.5-VL-72B while maintaining a significantly smaller parameter footprint.
             </p>
-            <img src="asset/eagle_2_5_performance.png" alt="Eagle 2.5 scaling properties" class="inserted-image-noshadow">
+            <img src="asset/eagle_2_5_performance.png" alt="Eagle 2.5 scaling properties" class="inserted-image-noshadow" data-aos="zoom-in" data-aos-delay="200">
         </div>
 
         <!-- VILA-HD Part -->
 
         <br>
-        <div class="description-content">
+        <!-- <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Model Architecture</h2>
             <p>
                 We design Eagle-2.5 as a versatile multimodal system capable of efficiently processing long-context information, rather than a specialized model solely optimized for handling extended multimodal inputs.
@@ -1076,9 +1218,30 @@ Zhiding Yu†, Guilin Liu† -->
                 In this work, we utilize the Qwen2.5 series models. To effectively handle any-resolution images, we adopt the image tiling strategy, inspired by LLaVA-1.5 and InternVL.
             </p>
             <img src="asset/eagle_2_5_model.jpg" alt="model architecture" class="inserted-image-noshadow" style="width: 80%;">
+        </div> -->
+
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
+            <h2>SOTA Performance across Image and Video Understanding</h2>
+            <p>
+                Eagle 2.5 demonstrates exceptional performance across a wide range of image and video understanding benchmarks, achieving competitive results compared to both open-source and proprietary models with significantly larger parameter counts.
+            </p>
+
+            <h3>Video Understanding</h3>
+            <p>
+                Eagle2.5-8B shows remarkable capabilities on multiple video benchmarks, achieving 74.8 on MVBench, 82.0 on Perception_test, and 72.2 on EgoSchema, outperforming similar-sized models like InternVL2.5-8B (72.0) and Qwen2.5-VL-8B (69.6, 70.5, 65.0). It particularly excels in long-form video understanding with 77.6 on MLVU and 66.4 on LongVideobench, surpassing even InternVL2.5-78B (75.7, 63.6). On VideoMME (without subtitles), Eagle 2.5 achieves 72.4, coming extremely close to 72B parameter models while using far fewer parameters.
+            </p>
+
+            <img src="asset/video_sota.jpg" alt="motivation" class="inserted-image-noshadow">
+
+            <h3>Image Understanding</h3>
+            <p>
+                Eagle2.5-8B demonstrates versatile image understanding across document comprehension (94.1 on DocVQA, 87.5 on ChartQA), information extraction (80.4 on InfoVQA, 83.7 on TextVQA), and optical character recognition (869 on OCRBench). The model also shows balanced capabilities in general perception and reasoning tasks (66.2 on MMstar, 76.7 on RWQA, 81.7 on MMB₁.₁), domain-specific knowledge (55.8 on MMMU, 84.5 on AI2D), visual hallucination assessment (54.7 on HallB), and even mathematical reasoning (67.8 on MathVista).
+            </p>
+
+            <img src="asset/image_sota.jpg" alt="motivation" class="inserted-image-noshadow">
         </div>
         
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Training Strategy</h2>
             <p>
                 Our approach contains two key components to achieve effective long-context training: first, an information-first sampling strategy that establishes optimal sampling criteria; and second, a progressive training schedule based on this strategy, which directs the entire model training process.
@@ -1107,26 +1270,7 @@ Zhiding Yu†, Guilin Liu† -->
             <img src="asset/training_schedule.png" alt="motivation" class="inserted-image-noshadow">
         </div>
 
-        <div class="description-content">
-            <h2>SOTA Performance across Image and Video Understanding</h2>
-            <p>
-                Eagle 2.5 demonstrates exceptional performance across a wide range of image and video understanding benchmarks, achieving competitive results compared to both open-source and proprietary models with significantly larger parameter counts.
-            </p>
-
-            <h3>Video Understanding</h3>
-            <p>
-                Eagle2.5-8B shows remarkable capabilities on multiple video benchmarks, achieving 74.8 on MVBench, 82.0 on Perception_test, and 72.2 on EgoSchema, outperforming similar-sized models like InternVL2.5-8B (72.0) and Qwen2.5-VL-8B (69.6, 70.5, 65.0). It particularly excels in long-form video understanding with 77.6 on MLVU and 66.4 on LongVideobench, surpassing even InternVL2.5-78B (75.7, 63.6). On VideoMME (without subtitles), Eagle 2.5 achieves 72.4, coming extremely close to 72B parameter models while using far fewer parameters.
-            </p>
-
-            <img src="asset/video_sota.jpg" alt="motivation" class="inserted-image-noshadow">
-
-            <h3>Image Understanding</h3>
-            <p>
-                Eagle2.5-8B demonstrates versatile image understanding across document comprehension (94.1 on DocVQA, 87.5 on ChartQA), information extraction (80.4 on InfoVQA, 83.7 on TextVQA), and optical character recognition (869 on OCRBench). The model also shows balanced capabilities in general perception and reasoning tasks (66.2 on MMstar, 76.7 on RWQA, 81.7 on MMB₁.₁), domain-specific knowledge (55.8 on MMMU, 84.5 on AI2D), visual hallucination assessment (54.7 on HallB), and even mathematical reasoning (67.8 on MathVista).
-            </p>
-
-            <img src="asset/image_sota.jpg" alt="motivation" class="inserted-image-noshadow">
-        </div>
+        
 
         
 
@@ -1134,11 +1278,11 @@ Zhiding Yu†, Guilin Liu† -->
         <!-- Eagle-Video-110K Part -->
 
         <br>
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h1>Eagle-Video-110K: A Diverse Video Dataset for Long-Context Understanding</h1>
         </div>
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Addressing Insufficient Video Length in Existing Datasets</h2>
             <p>
                 Existing video datasets often contain videos that are too short for comprehensive long-context understanding. Eagle-Video-110K addresses this limitation by curating a diverse collection of longer videos from multiple sources including Vidchapters, MiraData, InternVid-10M, Panda-70M, Vript, Shot2story, ViTT, and WebVid-10M. Using a diversity-driven strategy with CLIP embeddings and similarity thresholds, we identify and select novel videos that significantly extend the average duration available for training and evaluation.
@@ -1146,7 +1290,7 @@ Zhiding Yu†, Guilin Liu† -->
             <img src="asset/video_duration_comparison_full.png" alt="Comparison of video lengths across datasets" class="inserted-image-noshadow">
         </div>
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Dual Annotation Pipeline for Comprehensive Understanding</h2>
             <p>
                 Eagle-Video-110K features a novel dual annotation pipeline that combines both top-down and bottom-up approaches for comprehensive video understanding. In the top-down approach, we leverage human-annotated chapters as semantically meaningful video segments, generating chapter-level dense captions with GPT-4o and long-form QA pairs with GPT-4. Simultaneously, our bottom-up approach focuses on localized spatiotemporal details by generating clip-level QA pairs enhanced with time interval references and textual context anchors. This hierarchical methodology enables both fine-grained temporal understanding and high-level semantic comprehension, creating a dataset that effectively supports long-context video reasoning.
@@ -1154,7 +1298,7 @@ Zhiding Yu†, Guilin Liu† -->
             <img src="asset/annotation.png" alt="Dual annotation pipeline" class="inserted-image-noshadow">
         </div>
 
-        <div class="description-content">
+        <div class="description-content" data-aos="fade-up" data-aos-duration="1000">
             <h2>Impact on Video Understanding Performance</h2>
             <p>
                 Eagle-Video-110K significantly enhances model performance across both mainstream long and short video benchmarks. Most notably, it substantially improves the model's capability to handle high frame counts (≥128 frames) by providing training data with longer videos that were previously absent in open-source training sets. This improvement is particularly evident on the Video-MME benchmark, where Eagle 2.5 trained with Eagle-Video-110K demonstrates consistent performance scaling with increasing frame counts, unlike other models that plateau or degrade with longer inputs.
@@ -1217,13 +1361,11 @@ Zhiding Yu†, Guilin Liu† -->
                                 href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
                                 Commons Attribution-ShareAlike 4.0 International License</a>.
                         </p>
-                        <p>Total clicks:
-                            <span id="busuanzi_page_pv"></span>
-                        </p>
                         </p> -->
                         <p>
-                            We thank <a
-                                href="https://nvlabs.github.io/VILA/" target="_blank">NVILA</a> for the project page template.
+                            This website is licensed under a <a rel="license"
+                                href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
+                                Commons Attribution-ShareAlike 4.0 International License</a>.
                         </p>
                     </div>
                 </div>
@@ -1271,6 +1413,54 @@ Zhiding Yu†, Guilin Liu† -->
             // slider_black.style.left = `${percentage}%`;
             image2.style.clipPath = `inset(0 0 0 ${percentage}%)`;
             // image4.style.clipPath = `inset(0 0 0 ${percentage}%)`;
+        });
+    </script>
+
+    <!-- Initialize AOS animations -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            AOS.init({
+                duration: 800,
+                easing: 'ease-in-out',
+                once: false,
+                mirror: false
+            });
+            
+            // Add intersection observer for custom animations
+            const faders = document.querySelectorAll('.fade-in');
+            const sliders = document.querySelectorAll('.from-left, .from-right');
+            const scalers = document.querySelectorAll('.scale-in');
+            
+            const appearOptions = {
+                threshold: 0.2,
+                rootMargin: "0px 0px -100px 0px"
+            };
+            
+            const appearOnScroll = new IntersectionObserver(function(entries, appearOnScroll) {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    entry.target.classList.add('appear');
+                    appearOnScroll.unobserve(entry.target);
+                });
+            }, appearOptions);
+            
+            faders.forEach(fader => {
+                appearOnScroll.observe(fader);
+            });
+            
+            sliders.forEach(slider => {
+                appearOnScroll.observe(slider);
+            });
+            
+            scalers.forEach(scaler => {
+                appearOnScroll.observe(scaler);
+            });
+
+            // Add animation delay to author links
+            const authorLinks = document.querySelectorAll('.hero p a');
+            authorLinks.forEach((link, index) => {
+                link.style.setProperty('--index', index);
+            });
         });
     </script>
 </body>
