@@ -28,6 +28,7 @@ class SeparatorStyle(Enum):
     TWO = auto()
     MPT = auto()
     PLAIN = auto()
+    Qwen = auto()
     LLAMA_2 = auto()
 
 
@@ -107,6 +108,16 @@ class Conversation:
                 else:
                     ret += ""
             ret = ret.lstrip(self.sep)
+        elif self.sep_style == SeparatorStyle.QWEN:
+            ret = "" if self.system == "" else self.system + self.sep + "\n"
+            for role, message in messages:
+                if message:
+                    if type(message) is tuple:
+                        message, images, _ = message
+                        message = "<image>" + len(images) + message
+                    ret += role + "\n" + message + self.sep + "\n"
+                else:
+                    ret += role + "\n"
         elif self.sep_style == SeparatorStyle.PLAIN:
             seps = [self.sep, self.sep2]
             ret = self.system

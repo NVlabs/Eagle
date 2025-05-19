@@ -242,7 +242,7 @@ class ConvNeXt(nn.Module):
     def __init__(
             self,
             in_chans: int = 3,
-            num_classes: int = 1000,
+            num_classes: int = 1024,
             global_pool: str = 'avg',
             output_stride: int = 32,
             depths: Tuple[int, ...] = (3, 3, 9, 3),
@@ -483,16 +483,24 @@ def checkpoint_filter_fn(state_dict, model):
 
 
 def _create_convnext(variant, pretrained=False, **kwargs):
+    pretrained_path = kwargs.pop('pretrained_path', None)
     if kwargs.get('pretrained_cfg', '') == 'fcmae':
         # NOTE fcmae pretrained weights have no classifier or final norm-layer (`head.norm`)
         # This is workaround loading with num_classes=0 w/o removing norm-layer.
         kwargs.setdefault('pretrained_strict', False)
 
     model = build_model_with_cfg(
-        ConvNeXt, variant, pretrained,
+        ConvNeXt, variant, pretrained=False,
         pretrained_filter_fn=checkpoint_filter_fn,
         feature_cfg=dict(out_indices=(0, 1, 2, 3), flatten_sequential=True),
         **kwargs)
+    
+    if pretrained and pretrained_path:
+        try:
+            state_dict = checkpoint_filter_fn(torch.load(pretrained_path), model)
+            model.load_state_dict(state_dict, stric=kwargs.pop('pretrained_strict', True))
+        except Exception as e:
+            print(f"加载模型权重失败：{e}")
     return model
 
 
@@ -1013,7 +1021,7 @@ default_cfgs = generate_default_cfgs({
 
 # @register_model
 def convnext_xxlarge(pretrained=False, **kwargs) -> ConvNeXt:
-    model_args = dict(depths=[3, 4, 30, 3], dims=[384, 768, 1536, 3072], norm_eps=kwargs.pop('norm_eps', 1e-5))
+    model_args = dict(num_classes=1024, depths=[3, 4, 30, 3], dims=[384, 768, 1536, 3072], norm_eps=kwargs.pop('norm_eps', 1e-5))
     model = _create_convnext('convnext_xxlarge', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 

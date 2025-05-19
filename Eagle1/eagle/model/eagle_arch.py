@@ -156,28 +156,36 @@ class EagleMetaForCausalLM(ABC):
     def get_vision_tower(self):
         return self.get_model().get_vision_tower()
 
-    def encode_images(self, images):
-        image_features = self.get_model().get_vision_tower()(images)
+    def encode_images(self, convnext_images, qwen_images=None):
+        features = self.get_model().get_vision_tower()(convnext_images, qwen_images)
+        image_features = features['fusion_features']
         image_features = self.get_model().mm_projector(image_features)
-        return image_features
+        qwen2_5_visual_features = features['qwen2_5_visual_features']
+        return {
+            "image_features": image_features,
+            "qwen2_5_visual_features": qwen2_5_visual_features
+        }
 
     def prepare_inputs_labels_for_multimodal(
         self, input_ids, position_ids, attention_mask, past_key_values, labels,
-        images, image_sizes=None
+        convnext_images, qwen_images=None, image_sizes=None
     ):
         vision_tower = self.get_vision_tower()
-        if vision_tower is None or images is None or input_ids.shape[1] == 1:
+        if vision_tower is None or convnext_images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
-        if type(images) is list or images.ndim == 5:
-            if type(images) is list:
-                images = [x.unsqueeze(0) if x.ndim == 3 else x for x in images]
-            concat_images = torch.cat([image for image in images], dim=0)
-            image_features = self.encode_images(concat_images)
-            split_sizes = [image.shape[0] for image in images]
+        if type(convnext_images) is list or convnext_images.ndim == 5:
+            if type(convnext_images) is list:
+                convnext_images = [x.unsqueeze(0) if x.ndim == 3 else x for x in convnext_images]
+            concat_images = torch.cat([image for image in convnext_images], dim=0)
+            features = self.encode_images(concat_images, qwen_images)
+            image_features = features["image_features"]
+            split_sizes = [image.shape[0] for image in convnext_images]
             image_features = torch.split(image_features, split_sizes, dim=0)
             mm_patch_merge_type = getattr(self.config, 'mm_patch_merge_type', 'flat')
             image_aspect_ratio = getattr(self.config, 'image_aspect_ratio', 'square')
+            print(f"[DEBUG] mm_patch_merge_type :{image_aspect_ratio}")
+            print(f"[DEBUG] image_aspect_ratio :{mm_patch_merge_type}")
             if mm_patch_merge_type == 'flat':
                 image_features = [x.flatten(0, 1) for x in image_features]
             elif mm_patch_merge_type.startswith('spatial'):
@@ -218,7 +226,12 @@ class EagleMetaForCausalLM(ABC):
             else:
                 raise ValueError(f"Unexpected mm_patch_merge_type: {self.config.mm_patch_merge_type}")
         else:
-            image_features = self.encode_images(images)
+            print(f"[DEBUG] type(convnext_images) is list or convnext_images.ndim == 5 :{type(convnext_images) is list or convnext_images == 5}")
+            features = self.encode_images(convnext_images, qwen_images)
+            image_features = features["image_features"]
+            if features['qwen2_5_visual_features'] is not None:
+                qwen2_5_visual_features = features['qwen2_5_visual_features']
+                image_features = torch.cat((image_features, qwen2_5_visual_features), dim=1)
 
         # TODO: image start / end is not implemented here to support pretraining.
         if getattr(self.config, 'tune_mm_mlp_adapter', False) and getattr(self.config, 'mm_use_im_start_end', False):

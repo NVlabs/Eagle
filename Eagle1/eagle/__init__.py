@@ -1,1 +1,1 @@
-from .model import EagleLlamaForCausalLM
+from .model import EagleLlamaForCausalLM, EagleQwenForCausalLM
