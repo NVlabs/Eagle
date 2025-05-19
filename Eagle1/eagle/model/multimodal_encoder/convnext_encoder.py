@@ -51,13 +51,13 @@ class ConvNextVisionTower(nn.Module):
         self.vision_tower_name = vision_tower
         self.select_layer = -1 # hardcode
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
-
+        self.args = args
         self.load_model()
 
     def load_model(self):
         self.image_processor = CLIPImageProcessor(**cfg)
         if 'xxlarge' in self.vision_tower_name:
-            self.vision_tower = convnext_xxlarge(self.vision_tower_name)
+            self.vision_tower = convnext_xxlarge(self.vision_tower_name, pretrained_path = self.args.vision_tower_pretrained_from)
             setattr(self.vision_tower, 'hidden_size', 3072)
         else:
             raise NotImplementedError

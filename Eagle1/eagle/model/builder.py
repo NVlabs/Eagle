@@ -65,12 +65,19 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
         if 'lora' in model_name.lower() and model_base is None:
             warnings.warn('There is `lora` in model name but no `model_base` is provided. If you are loading a LoRA model, please provide the `model_base` argument. Detailed instruction: https://github.com/haotian-liu/LLaVA#launch-a-model-worker-lora-weights-unmerged.')
         if 'lora' in model_name.lower() and model_base is not None:
-            from eagle.model.language_model.eagle_llama import eagleConfig
-            lora_cfg_pretrained = eagleConfig.from_pretrained(model_path)
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
-            print('Loading eagle from base model...')
-            model = EagleLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, **kwargs)
-            token_num, tokem_dim = model.lm_head.out_features, model.lm_head.in_features
+            if 'qwen' in model_name.lower():
+                from eagle.model.language_model.eagle_qwen import EagleQwenConfig
+                lora_cfg_pretrained = EagleQwenConfig.from_pretrained(model_path)
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                print('Loading eagle qwen from base model...')
+                model = EagleQwenForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, **kwargs)
+            else:
+                from eagle.model.language_model.eagle_llama import eagleConfig
+                lora_cfg_pretrained = eagleConfig.from_pretrained(model_path)
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                print('Loading eagle from base model...')
+                model = EagleLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=lora_cfg_pretrained, **kwargs)
+                token_num, tokem_dim = model.lm_head.out_features, model.lm_head.in_features
             if model.lm_head.weight.shape[0] != token_num:
                 model.lm_head.weight = torch.nn.Parameter(torch.empty(token_num, tokem_dim, device=model.device, dtype=model.dtype))
                 model.model.embed_tokens.weight = torch.nn.Parameter(torch.empty(token_num, tokem_dim, device=model.device, dtype=model.dtype))
@@ -102,21 +109,32 @@ def load_pretrained_model(model_path, model_base, model_name, load_8bit=False, l
         elif model_base is not None:
             # this may be mm projector only
             print('Loading Eagle from base model...')
-
-            tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
-            cfg_pretrained = AutoConfig.from_pretrained(model_path)
-            model = EagleLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
+            if 'qwen' in model_name.lower():
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                cfg_pretrained = AutoConfig.from_pretrained(model_path)
+                model = EagleQwenForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=False)
+                cfg_pretrained = AutoConfig.from_pretrained(model_path)
+                model = EagleLlamaForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True, config=cfg_pretrained, **kwargs)
 
             mm_projector_weights = torch.load(os.path.join(model_path, 'mm_projector.bin'), map_location='cpu')
             mm_projector_weights = {k: v.to(torch.float16) for k, v in mm_projector_weights.items()}
             model.load_state_dict(mm_projector_weights, strict=False)
         else:
             tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-            model = EagleLlamaForCausalLM.from_pretrained(
-                model_path,
-                low_cpu_mem_usage=True,
-                **kwargs
-            )
+            if 'qwen' in model_name.lower():
+                model = EagleQwenForCausalLM.from_pretrained(
+                    model_path,
+                    low_cpu_mem_usage=True,
+                    **kwargs
+                )
+            else:
+                model = EagleLlamaForCausalLM.from_pretrained(
+                    model_path,
+                    low_cpu_mem_usage=True,
+                    **kwargs
+                )
     else:
         # Load language model
         if model_base is not None:

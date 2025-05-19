@@ -22,6 +22,8 @@ from .hr_clip_encoder import HRCLIPVisionTower
 from .vision_models.eva_vit import EVAVITVisionTower
 from .sam_encoder import SAMVisionTower
 from .pix2struct_encoder import Pix2StructLargeVisionTower
+from .timm_encoder import TimmVisionTower
+from .qwen2_5vl_encoder import QwenVisionTower
 import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 from copy import deepcopy
@@ -62,6 +64,7 @@ class MultiBackboneChannelConcatenationVisionTower(nn.Module):
                 convnext_args = deepcopy(args)
                 convnext_args.freeze_vision = False
                 convnext_args.input_image_size = 1024
+                convnext_args.vision_tower_pretrained_from = '/mnt/models/convnext/pytorch_model.bin'
                 convnext_vision_tower = "convnext_xxlarge.clip_laion2b_soup" # hardcode
                 convnext_vision_tower = ConvNextVisionTower(convnext_vision_tower, 
                                                                 convnext_args)
@@ -95,7 +98,29 @@ class MultiBackboneChannelConcatenationVisionTower(nn.Module):
                 clip_vision_tower = HRCLIPVisionTower("openai/clip-vit-large-patch14-336", clip_args)     
                 clip_vision_tower.load_model()
                 self.vision_towers.append(clip_vision_tower)
-        
+
+            elif name == 'timm-vit':
+                timm_args = deepcopy(args)
+                timm_args.freeze_vision = False
+                timm_args.input_image_size = 1024
+                timm_vision_tower = TimmVisionTower("uni_v1", timm_args)
+                timm_vision_tower.load_model(PYTORCH_CKPT_PATH='/mnt/models/UNI/pytorch_model.bin')
+                self.vision_towers.append(timm_vision_tower)
+
+            elif name == 'qwen2_5-vl':
+                qwen_args = deepcopy(args)
+                qwen_args.freeze_vision = False
+                qwen_args.input_image_size = 1024
+
+                qwen_vision_tower = QwenVisionTower(
+                    "qwen2_5-vl",
+                    qwen_args
+                )
+
+                qwen_vision_tower.load_model()
+                self.vision_towers.append(qwen_vision_tower)
+                self.qwen_processor = qwen_vision_tower.image_processor
+
         # a hardcode here, so we always use convnext in the vision encoder mixture
         self.image_processor = convnext_vision_tower.image_processor
         self.is_loaded = True
@@ -103,8 +128,14 @@ class MultiBackboneChannelConcatenationVisionTower(nn.Module):
     def load_model(self):
         assert self.is_loaded, "All the vision encoders should be loaded during initialization!"
 
-    def forward(self, x):
+    def forward(self, x, xq=None):
         features = []
+        if isinstance(self.vision_towers[-1], QwenVisionTower):
+            self.qwen2_5_vision_tower = self.vision_towers[-1]
+            self.vision_towers = self.vision_towers[:-1]
+        else:
+            self.qwen2_5_vision_tower = None
+
         for vision_tower in self.vision_towers:
             if vision_tower.input_image_size != self.input_image_size:
                 resized_x = F.interpolate(x.float(), 
@@ -131,7 +162,15 @@ class MultiBackboneChannelConcatenationVisionTower(nn.Module):
         
         features = torch.cat(features, dim=-1)
 
-        return features
+        if self.qwen2_5_vision_tower is not None:
+            qwen2_5_images_features = self.qwen2_5_vision_tower(xq)
+        else:
+            qwen2_5_images_features = None
+
+        return {
+            "fusion_feature": features,
+            "qwen2_5_images_features": qwen2_5_images_features
+        }
         
     @property
     def dummy_feature(self):

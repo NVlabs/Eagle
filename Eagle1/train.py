@@ -68,6 +68,7 @@ IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= versio
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
+    qwen_visual_tower_path: Optional[str] = field(default="/mnt/models/qwen2.5-vl-3B-instruct")
     version: Optional[str] = field(default="v0")
     freeze_backbone: bool = field(default=False)
     tune_mm_mlp_adapter: bool = field(default=False)
@@ -125,6 +126,7 @@ class TrainingArguments(transformers.TrainingArguments):
     vision_tower_layer_decay: Optional[float] = None
     vision_tower_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
+    attn_implementation: str = field(default="flash_attention_2", metadata={"help": "Use transformers attention implementation."})
 
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -346,6 +348,78 @@ def preprocess_multimodal(
 
     return sources
 
+def preprocess_qwen(sources, tokenizer: transformers.PreTrainedTokenizer, has_image: bool = False, max_len=2048, system_message: str = "You are a helpful assistant.") -> Dict:
+    # roles = ("human": "<|im_start|>user", "gpt": "<|im_start|>assistant")
+    roles = {"human": "user", "gpt": "assistant"} 
+
+    # Add image tokens to tokenizer as a special tokens
+    # Use a deepcopy of tokenizer so that we don't modify on the tokenizer
+    tokenizer = copy.deepcopy(tokenizer)
+
+    # When there is actually an image, we add the image tokens as a special token
+    if has_image:
+        tokenizer.add_tokens(["<image>"], special_tokens=True)
+
+    image_token_index = tokenizer.convert_tokens_to_ids("<image>")
+    im_start, im_end = tokenizer.additional_special_tokens_ids
+
+    unmask_tokens_idx = [198, im_start, im_end] 
+    nl_tokens = tokenizer("\n").input_ids
+
+    # Reset Owen chat templates so that it won't include system message every time we apply
+    chat_template = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n'}}{% endif %}"
+    tokenizer.chat_template = chat_template
+
+    # Apply prompt templates
+    input_ids_list, targets_list = [], [] # Renamed to avoid clash with final tensor names
+    for i, source in enumerate(sources):
+        if roles[source[0]["from"]] != roles["human"]: # Assumes roles dict has "human"
+            # This might fail if source[0]["from"] is not in roles
+            source = source[1:]
+
+        input_id = [] 
+        target = []
+
+        system_tokens = tokenizer.apply_chat_template([{"role": "system", "content": system_message}])
+        input_id.extend(system_tokens) 
+        target.extend([IGNORE_INDEX] * len(system_tokens))
+
+        for conv_turn in source:
+            # Make sure llava data can load
+            try:
+                role = conv_turn["role"]
+                content = conv_turn["content"]
+            except: # Bare except is generally discouraged
+                role = conv_turn["from"]
+                content = conv_turn["value"]
+
+            role = roles.get(role, role) # Use .get for safety if role not in roles_mapping
+
+            conv_for_template = [{"role": role, "content": content}]
+            encode_id = tokenizer.apply_chat_template(conv_for_template)
+
+            input_id.extend(encode_id) 
+            if role in ["user", "system"]: 
+                target.extend([IGNORE_INDEX] * len(encode_id))
+            else:
+                target.extend(encode_id)
+
+        assert len(input_id) == len(target), f"{len(input_id)} != {len(target)}"
+        for idx, current_encode_id in enumerate(input_id):
+            if current_encode_id in unmask_tokens_idx:
+                target[idx] = current_encode_id
+            if current_encode_id == image_token_index:
+                input_id[idx] = IMAGE_TOKEN_INDEX
+        input_ids_list.append(input_id)
+        targets_list.append(target)
+
+    input_ids = input_ids_list
+    targets = targets_list
+
+    return dict(
+        input_ids=input_ids,  # tensor(bs x seq_len)
+        labels=targets, # tensor(bs x seq_len)
+    )
 
 def preprocess_llama_2(
     sources,
@@ -826,6 +900,8 @@ def preprocess(
         return preprocess_yi34b_chatml(sources, tokenizer, has_image=has_image)
     if conversation_lib.default_conversation.version == "mpt":
         return preprocess_mpt(sources, tokenizer, has_image=has_image)
+    if conversation_lib.default_conversation.version == "qwen":
+        return preprocess_qwen(sources, tokenizer, has_image=has_image)
     # add end signal and concatenate together
     conversations = []
     for source in sources:
@@ -867,6 +943,8 @@ class LazySupervisedDataset(Dataset):
         self.tokenizer = tokenizer
         self.list_data_dict = list_data_dict
         self.data_args = data_args
+        self.image_processor = data_args.image_processor
+        self.qwen_processor = data_args.qwen_processor
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -915,10 +993,12 @@ class LazySupervisedDataset(Dataset):
                         result = Image.new(pil_img.mode, (height, height), background_color)
                         result.paste(pil_img, ((height - width) // 2, 0))
                         return result
-                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                image = expand2square(image, tuple(int(x*255) for x in self.image_processor.image_mean))
+                qwen_image = self.qwen_processor(image.resize((1024, 1024)), return_tensors='pt')
+                image = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             else:
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                qwen_image = self.qwen_processor(image.resize((1024, 1024)), return_tensors='pt')
+                image = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -939,6 +1019,9 @@ class LazySupervisedDataset(Dataset):
             # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
             data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+        if self.qwen_processor is not None:
+            data_dict['qwen_image'] = qwen_image
+
         return data_dict
 
 
@@ -972,6 +1055,11 @@ class DataCollatorForSupervisedDataset(object):
                 batch['images'] = torch.stack(images)
             else:
                 batch['images'] = images
+
+        if 'qwen_image' in instances[0]:
+            batch['qwen_images'] = {}
+            batch['qwen_images']['pixel_values'] = [ins['qwen_image']['pixel_values'] for ins in instances]
+            batch['qwen_images']['image_grid_thw'] = [ins['qwen_image']['image_grid_thw'] for ins in instances]
 
         return batch
 
@@ -1018,18 +1106,27 @@ def train(attn_implementation=None):
         ))
 
     if model_args.vision_tower is not None:
-        model = EagleLlamaForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            attn_implementation=attn_implementation,
-            torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-            **bnb_model_from_pretrained_args
-        )
+        if "qwen" in model_args.model_name_or_path.lower():
+            model = EagleQwenForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                cache_dir=training_args.cache_dir,
+                attn_implementation=training_args.attn_implementation,
+                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+                **bnb_model_from_pretrained_args
+            )
+        else:
+            model = EagleLlamaForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                cache_dir=training_args.cache_dir,
+                attn_implementation=training_args.attn_implementation,
+                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+                **bnb_model_from_pretrained_args
+            )
     else:
         model = transformers.LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
-            attn_implementation=attn_implementation,
+            attn_implementation=training_args.attn_implementation,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
@@ -1120,6 +1217,7 @@ def train(attn_implementation=None):
         vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
 
         data_args.image_processor = vision_tower.image_processor
+        data_args.qwen_processor = vision_tower.qwen_processor
         data_args.is_multimodal = True
 
         model.config.image_aspect_ratio = data_args.image_aspect_ratio

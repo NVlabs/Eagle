@@ -1,1 +1,2 @@
 from .language_model.eagle_llama import EagleLlamaForCausalLM, EagleConfig
+from .language_model.eagle_qwen import EagleQwenForCausalLM, EagleQwenConfig
