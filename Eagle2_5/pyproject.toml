@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eagle_vl"
+version = "2.5"
+description = "Eagle 2.5: Boosting Long-Context Post-Training for Frontier Vision-Language Models"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
+
+dependencies = ["transformers==4.51.0", "tokenizers==0.21.1", "sentencepiece==0.2.0", "shortuuid",
+    "accelerate==1.5.2", "peft==0.12.0", "bitsandbytes", "wandb==0.17.7",
+    "pydantic==2.10.6", "markdown2[all]", "numpy==1.26.4", "scikit-learn>=1.2.2",
+    "gradio", "gradio_client", "lmdb",
+    "requests", "httpx==0.28.1", "uvicorn", "fastapi", "streamlit", "streamlit-image-select", 
+    "einops", "einops-exts", "timm==1.0.11", "deepspeed==0.16.5", "av", "liger_kernel==0.3.1", "filetype", "bitstring",
+    "ebmlite", "triton==3.1.0", "scipy>=1.10.0", "datasets==2.21.0",  "dotenv", "decord", "scikit-image", "imagehash", "swanlab",
+    "torchcodec"
+]
+
+
+
+[project.urls]
+"Homepage" = "https://nvlabs.github.io/EAGLE/"
+"Bug Tracker" = "https://github.com/NVlabs/EAGLE/issues"
+
+[tool.setuptools.packages.find]
+exclude = ["tools", "data*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "shell*", "work_dirs*", "pretrained*", "vid_playground*", "wandb*", "vlmeval*", "internel*", "streamlit*"]
+
+[tool.wheel]
+exclude = ["tools", "data*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "shell*", "work_dirs*", "pretrained*", "vid_playground*", "wandb*", "vlmeval*", "internel*", "streamlit*"]
