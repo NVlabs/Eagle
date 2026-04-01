@@ -193,8 +193,8 @@ If you find this project useful, please cite our work:
 
 
 ## License/Terms of Use
-- The code is released under the Apache 2.0 license as found in the [LICENSE](https://gitlab-master.nvidia.com/perceptron/model/vlm/eagle/-/blob/main/LICENSE) file. Portions of the code in this repo are reused and subject to their original licenses. Some files have been modified, with appropriate attribution and additional license headers added where applicable.
-- The pretrained Eagle 2 & 2.5 model weights are released under the [NVIDIA License](https://gitlab-master.nvidia.com/perceptron/model/vlm/eagle/-/blob/main/LICENSE_Model). The models are research preview intended for non-commercial use only, and are subject to the following licenses and terms:
+- The code is released under the Apache 2.0 license as found in the [LICENSE](LICENSE) file. Portions of the code in this repo are reused and subject to their original licenses. Some files have been modified, with appropriate attribution and additional license headers added where applicable.
+- The pretrained Eagle 2 & 2.5 model weights are released under the [NVIDIA License](LICENSE_Model). The models are research preview intended for non-commercial use only, and are subject to the following licenses and terms:
   - Model License of Qwen2.5-7B-Instruct: [Apache-2.0](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/blob/main/LICENSE)
   - Eagle 2 - Model License of PaliGemma SigLIP: [Gemma License](https://ai.google.dev/gemma/terms)
   - Eagle 2 - Model License of CLIP ConvNeXt: [MIT](https://choosealicense.com/licenses/mit/)
