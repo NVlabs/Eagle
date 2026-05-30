@@ -10,7 +10,7 @@
 //
 // The canonical Phase 1 ONNX graph (cpp_trt/export/export_vision_onnx.py) has a
 // SINGLE input (pixel_values) and a SINGLE output (vit_embeds). There is no
-// grid_hws input at N=1 (cu_seqlens degenerates to [0, L], pos-emb and RoPE are
+// grid_hws input at N=1 (cu_seqlens degenerates to [0, L]; pos-emb and RoPE are
 // baked constants for the resolution bucket). This wrapper matches that contract.
 //
 // All TensorRT/CUDA dependencies are compiled only when LA_BUILD_TRT is defined.
@@ -22,8 +22,8 @@
 //   * Engine I/O is FP16 on the device. Host callers pass FP32 and the wrapper
 //     converts to/from FP16; or pass a device FP16 pointer via RunOptions.
 //   * Engine bindings (by name): "pixel_values" (in), "vit_embeds" (out).
-//
-#pragma once
+#ifndef LA_VISION_VISIONENGINE_H
+#define LA_VISION_VISIONENGINE_H
 
 #include <cstdint>
 #include <memory>
@@ -32,8 +32,7 @@
 
 namespace la::vision {
 
-// Logical description of one engine I/O tensor (independent of TensorRT types so
-// this header has no TRT dependency).
+// Logical description of one engine I/O tensor (no TensorRT dependency).
 struct TensorSpec {
   std::string name;
   std::vector<int64_t> shape;
@@ -46,14 +45,14 @@ struct VisionEmbeds {
   std::vector<float> data;     // host copy (FP32, converted from engine FP16)
 };
 
+// Optional knobs for a single run().
+struct RunOptions {
+  bool input_is_device_ptr = false;  // pixel_values already on device as FP16
+  bool output_to_host = true;        // copy vit_embeds back to host
+};
+
 class VisionEngine {
  public:
-  // Optional knobs for a single run.
-  struct RunOptions {
-    bool input_is_device_ptr = false;  // pixel_values already on device as FP16
-    bool output_to_host = true;        // copy vit_embeds back to host
-  };
-
   // Construct from a serialized TRT engine file. Throws std::runtime_error on
   // failure (or if built without LA_BUILD_TRT).
   explicit VisionEngine(const std::string& engine_path);
@@ -66,10 +65,10 @@ class VisionEngine {
   // by default, or an FP16 device pointer when opts.input_is_device_ptr is set.
   // Returns vit_embeds [L/4, H_llm].
   VisionEmbeds run(const float* pixel_values, int64_t num_patches,
-                   const RunOptions& opts = {});
+                   RunOptions opts = RunOptions{});
 
-  // Static description of the engine's expected I/O (from the spec, not the loaded
-  // engine). Useful for validation/tests without a real engine.
+  // Static description of the engine's expected I/O (from the spec, not the
+  // loaded engine). Useful for validation/tests without a real engine.
   static std::vector<TensorSpec> io_spec();
 
  private:
@@ -80,3 +79,5 @@ class VisionEngine {
 };
 
 }  // namespace la::vision
+
+#endif  // LA_VISION_VISIONENGINE_H

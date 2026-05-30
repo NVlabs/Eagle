@@ -112,7 +112,7 @@ VisionEngine::~VisionEngine() = default;
 // ----------------------------------------------------------------------------
 
 VisionEmbeds VisionEngine::run(const float* pixel_values, int64_t num_patches,
-                               const RunOptions& opts) {
+                               RunOptions opts) {
   Impl& impl = *impl_;
 
   // ---- Set the dynamic input shape and bind it ----
@@ -210,7 +210,7 @@ VisionEngine::VisionEngine(const std::string&) {
 }
 VisionEngine::~VisionEngine() = default;
 
-VisionEmbeds VisionEngine::run(const float*, int64_t, const RunOptions&) {
+VisionEmbeds VisionEngine::run(const float*, int64_t, RunOptions) {
   throw std::runtime_error("VisionEngine: built without LA_BUILD_TRT");
 }
 
