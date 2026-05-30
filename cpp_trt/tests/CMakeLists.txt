@@ -50,3 +50,26 @@ la_add_test(test_vision_rope test_vision_rope.cpp ${LA_VISION_ROPE_TGT})
 la_add_test(test_preprocess  test_preprocess.cpp  ${LA_PREPROCESS_TGT})
 la_add_test(test_config      test_config.cpp      ${LA_CONFIG_TGT})
 la_add_test(test_tokenizer   test_tokenizer.cpp   ${LA_TOKENIZER_TGT})
+
+# ---------------------------------------------------------------------------
+# Phase-2 PURE-C++ tests for la_generate (sampling / coord / parse) and la_api
+# (prompts / parse_boxes / parse_points). Added by the Phase-2 test task.
+#
+# Uses the existing la_add_test(<test_name> <source> <module_lib>) helper +
+# la_resolve_target convention above. These link only TRT-free static libs
+# (la_generate, which PUBLIC-links la_config; and la_api) so they build in the
+# default LA_BUILD_TRT=OFF configuration.
+#
+# These tests need C++20 (la_generate / la_api are cxx_std_20), so we bump the
+# standard after la_add_test (which sets cxx_std_17) creates the targets.
+# ---------------------------------------------------------------------------
+la_resolve_target(LA_GENERATE_TGT la::generate la_generate)
+la_resolve_target(LA_API_TGT      la::api      la_api)
+
+la_add_test(test_generate test_generate.cpp ${LA_GENERATE_TGT})
+la_add_test(test_api      test_api.cpp      ${LA_API_TGT})
+
+# la_generate / la_api are compiled as C++20; their public headers (and the
+# tests) require it. Override the cxx_std_17 the helper sets.
+set_target_properties(test_generate test_api PROPERTIES
+  CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
