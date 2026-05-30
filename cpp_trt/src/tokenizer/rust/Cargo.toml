@@ -1,0 +1,24 @@
+[package]
+name = "la_tokenizer_ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI FFI binding to the HuggingFace tokenizers crate for LocateAnything (LocateAnything C++ port, Phase 0)."
+license = "Apache-2.0"
+publish = false
+
+[lib]
+# staticlib: linked directly into the C++ static lib `la_tokenizer`.
+# cdylib:   convenience for ad-hoc loading / debugging.
+name = "la_tokenizer_ffi"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+# Pin to a stable tokenizers release. `onig` is disabled to avoid a C build
+# dependency; the default unicode regex backend is used instead.
+tokenizers = { version = "0.20", default-features = false, features = ["progressbar", "esaxx_fast"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

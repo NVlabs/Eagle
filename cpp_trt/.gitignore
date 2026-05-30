@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+build*/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.engine
+*.onnx
+*.plan
+
+# Python
+__pycache__/
+*.pyc
+reference_dumps/
+
+# Editor / backup
+*.orig
+*.bak
+*.bak2
+*.log
+
+# Rust (tokenizer FFI)
+src/tokenizer/rust/target/
+src/tokenizer/rust/Cargo.lock
+
+# Probe leftovers
+build_check.*
