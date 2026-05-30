@@ -1,118 +1,165 @@
-# ============================================================================
 # FindTensorRT.cmake
+# -----------------------------------------------------------------------------
+# Locate an NVIDIA TensorRT installation (TRT 10.x, e.g. 10.11 in the project
+# Docker image).
 #
-# STATUS: STUB / UNUSED IN PHASE 0.
+# This module is ONLY invoked when the top-level option LA_BUILD_TRT is ON.
+# The default Phase 0 build is TRT-free and never includes this file, so a host
+# with no TensorRT installed still configures and builds the unit tests.
 #
-# Phase 0 of the LocateAnything C++ port builds pure-C++ targets only and does
-# NOT link TensorRT. This module is provided so that later phases (engine
-# build / inference runtime) have a single, documented place to discover an
-# installed TensorRT. It is intentionally non-fatal: it never calls
-# find_package_handle_standard_args with REQUIRED semantics so that including
-# it during Phase 0 cannot break a TRT-less build.
+# Search order for each component:
+#   1. The TensorRT_ROOT CMake/cache variable or environment variable.
+#   2. The CUDA toolkit root (CUDAToolkit_ROOT / CUDA_PATH) as a hint.
+#   3. Standard system locations (/usr, /usr/local, /usr/local/tensorrt).
 #
-# Later-phase usage (Phase 1+):
-#   find_package(TensorRT)          # optional discovery
-#   if(TensorRT_FOUND)
-#     target_link_libraries(<tgt> PRIVATE TensorRT::TensorRT)
-#   endif()
+# Result variables:
+#   TensorRT_FOUND          - TRUE if all required pieces were located.
+#   TensorRT_INCLUDE_DIRS   - Include directory containing NvInfer.h.
+#   TensorRT_LIBRARIES      - All located TensorRT import libraries.
+#   TensorRT_VERSION        - Version string parsed from NvInferVersion.h
+#                             (e.g. "10.11.0"), when available.
 #
-# Discovery inputs (set any of these to help the search):
-#   TENSORRT_ROOT       (CMake var or environment var)
-#   CMAKE_PREFIX_PATH
+# Imported target:
+#   TensorRT::TensorRT      - INTERFACE target carrying the include dirs and
+#                             all located libraries. Link against this.
 #
-# Outputs on success:
-#   TensorRT_FOUND
-#   TensorRT_INCLUDE_DIRS
-#   TensorRT_LIBRARIES
-#   TensorRT_VERSION            (parsed from NvInferVersion.h when available)
-#   imported target TensorRT::TensorRT
+# Components:
+#   nvinfer         (always required)
+#   nvonnxparser    (required by default; needed to parse exported ONNX)
+#   nvinfer_plugin  (optional; many builds use it, but it is not strictly
+#                    required to instantiate a runtime from a serialized engine)
 #
-# The reference deployment container is nvcr.io/nvidia/tensorrt:25.06-py3,
-# where headers live under /usr/include/x86_64-linux-gnu and libraries under
-# /usr/lib/x86_64-linux-gnu. TRT-LLM 0.20 @ 7c828d7 is a separate later-phase
-# dependency and is NOT discovered here.
-# ============================================================================
+# Usage:
+#   find_package(TensorRT REQUIRED)
+#   target_link_libraries(my_target PRIVATE TensorRT::TensorRT)
+# -----------------------------------------------------------------------------
 
-set(_la_trt_roots
-  "${TENSORRT_ROOT}"
-  "$ENV{TENSORRT_ROOT}"
-  "/usr"
-  "/usr/local/tensorrt"
-  "/opt/tensorrt")
+# Honor an explicit root from cache or environment.
+if(NOT TensorRT_ROOT AND DEFINED ENV{TensorRT_ROOT})
+  set(TensorRT_ROOT "$ENV{TensorRT_ROOT}")
+endif()
+if(NOT TensorRT_ROOT AND DEFINED ENV{TENSORRT_ROOT})
+  set(TensorRT_ROOT "$ENV{TENSORRT_ROOT}")
+endif()
 
-# --- headers --------------------------------------------------------------
+# CUDA toolkit can act as a hint (TRT is frequently co-located with CUDA, and
+# pip-installed TRT wheels live under the Python site-packages tensorrt_libs).
+set(_TRT_HINTS)
+if(TensorRT_ROOT)
+  list(APPEND _TRT_HINTS "${TensorRT_ROOT}")
+endif()
+if(DEFINED CUDAToolkit_ROOT)
+  list(APPEND _TRT_HINTS "${CUDAToolkit_ROOT}")
+endif()
+if(DEFINED ENV{CUDA_PATH})
+  list(APPEND _TRT_HINTS "$ENV{CUDA_PATH}")
+endif()
+
+set(_TRT_SYSTEM_PATHS
+  /usr
+  /usr/local
+  /usr/local/tensorrt
+  /opt/tensorrt
+  /opt/nvidia/tensorrt
+)
+
+# ---- headers ----------------------------------------------------------------
 find_path(TensorRT_INCLUDE_DIR
   NAMES NvInfer.h
-  HINTS ${_la_trt_roots}
+  HINTS ${_TRT_HINTS}
+  PATHS ${_TRT_SYSTEM_PATHS}
   PATH_SUFFIXES include include/x86_64-linux-gnu
-  DOC "TensorRT include directory (contains NvInfer.h)")
+  DOC "TensorRT include directory containing NvInfer.h"
+)
 
-# --- core libraries -------------------------------------------------------
+# ---- libraries --------------------------------------------------------------
+# Common per-arch lib suffixes; covers both tarball and apt layouts.
+set(_TRT_LIB_SUFFIXES
+  lib
+  lib64
+  lib/x86_64-linux-gnu
+  targets/x86_64-linux-gnu/lib
+)
+
 find_library(TensorRT_nvinfer_LIBRARY
   NAMES nvinfer
-  HINTS ${_la_trt_roots}
-  PATH_SUFFIXES lib lib64 lib/x86_64-linux-gnu
-  DOC "TensorRT nvinfer library")
+  HINTS ${_TRT_HINTS}
+  PATHS ${_TRT_SYSTEM_PATHS}
+  PATH_SUFFIXES ${_TRT_LIB_SUFFIXES}
+  DOC "TensorRT nvinfer library"
+)
 
 find_library(TensorRT_nvonnxparser_LIBRARY
   NAMES nvonnxparser
-  HINTS ${_la_trt_roots}
-  PATH_SUFFIXES lib lib64 lib/x86_64-linux-gnu
-  DOC "TensorRT nvonnxparser library")
+  HINTS ${_TRT_HINTS}
+  PATHS ${_TRT_SYSTEM_PATHS}
+  PATH_SUFFIXES ${_TRT_LIB_SUFFIXES}
+  DOC "TensorRT nvonnxparser library"
+)
 
-# --- version parse --------------------------------------------------------
+# nvinfer_plugin is optional.
+find_library(TensorRT_nvinfer_plugin_LIBRARY
+  NAMES nvinfer_plugin
+  HINTS ${_TRT_HINTS}
+  PATHS ${_TRT_SYSTEM_PATHS}
+  PATH_SUFFIXES ${_TRT_LIB_SUFFIXES}
+  DOC "TensorRT nvinfer_plugin library (optional)"
+)
+
+# ---- version ----------------------------------------------------------------
+# TRT 8.x kept the version macros in NvInferVersion.h; TRT 10.x still ships it.
 set(TensorRT_VERSION "")
-if(TensorRT_INCLUDE_DIR)
-  set(_la_trt_ver_hdr "")
-  if(EXISTS "${TensorRT_INCLUDE_DIR}/NvInferVersion.h")
-    set(_la_trt_ver_hdr "${TensorRT_INCLUDE_DIR}/NvInferVersion.h")
-  elseif(EXISTS "${TensorRT_INCLUDE_DIR}/NvInfer.h")
-    set(_la_trt_ver_hdr "${TensorRT_INCLUDE_DIR}/NvInfer.h")
-  endif()
-  if(_la_trt_ver_hdr)
-    file(STRINGS "${_la_trt_ver_hdr}" _la_trt_major REGEX "define NV_TENSORRT_MAJOR")
-    file(STRINGS "${_la_trt_ver_hdr}" _la_trt_minor REGEX "define NV_TENSORRT_MINOR")
-    file(STRINGS "${_la_trt_ver_hdr}" _la_trt_patch REGEX "define NV_TENSORRT_PATCH")
-    string(REGEX REPLACE "[^0-9]" "" _la_trt_major "${_la_trt_major}")
-    string(REGEX REPLACE "[^0-9]" "" _la_trt_minor "${_la_trt_minor}")
-    string(REGEX REPLACE "[^0-9]" "" _la_trt_patch "${_la_trt_patch}")
-    if(_la_trt_major)
-      set(TensorRT_VERSION "${_la_trt_major}.${_la_trt_minor}.${_la_trt_patch}")
+foreach(_trt_ver_hdr NvInferVersion.h NvInfer.h)
+  if(TensorRT_INCLUDE_DIR AND EXISTS "${TensorRT_INCLUDE_DIR}/${_trt_ver_hdr}")
+    file(STRINGS "${TensorRT_INCLUDE_DIR}/${_trt_ver_hdr}" _trt_ver_lines
+      REGEX "^#define (NV_TENSORRT_MAJOR|NV_TENSORRT_MINOR|NV_TENSORRT_PATCH) ")
+    if(_trt_ver_lines)
+      string(REGEX REPLACE ".*NV_TENSORRT_MAJOR ([0-9]+).*" "\\1"
+        _trt_major "${_trt_ver_lines}")
+      string(REGEX REPLACE ".*NV_TENSORRT_MINOR ([0-9]+).*" "\\1"
+        _trt_minor "${_trt_ver_lines}")
+      string(REGEX REPLACE ".*NV_TENSORRT_PATCH ([0-9]+).*" "\\1"
+        _trt_patch "${_trt_ver_lines}")
+      if(_trt_major MATCHES "^[0-9]+$")
+        set(TensorRT_VERSION "${_trt_major}.${_trt_minor}.${_trt_patch}")
+        break()
+      endif()
     endif()
   endif()
-endif()
+endforeach()
 
-# --- aggregate ------------------------------------------------------------
-set(TensorRT_FOUND FALSE)
-if(TensorRT_INCLUDE_DIR AND TensorRT_nvinfer_LIBRARY)
-  set(TensorRT_FOUND TRUE)
+# ---- standard handling ------------------------------------------------------
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(TensorRT
+  REQUIRED_VARS
+    TensorRT_INCLUDE_DIR
+    TensorRT_nvinfer_LIBRARY
+    TensorRT_nvonnxparser_LIBRARY
+  VERSION_VAR TensorRT_VERSION
+)
+
+if(TensorRT_FOUND)
   set(TensorRT_INCLUDE_DIRS "${TensorRT_INCLUDE_DIR}")
-  set(TensorRT_LIBRARIES "${TensorRT_nvinfer_LIBRARY}")
-  if(TensorRT_nvonnxparser_LIBRARY)
-    list(APPEND TensorRT_LIBRARIES "${TensorRT_nvonnxparser_LIBRARY}")
+  set(TensorRT_LIBRARIES
+    "${TensorRT_nvinfer_LIBRARY}"
+    "${TensorRT_nvonnxparser_LIBRARY}"
+  )
+  if(TensorRT_nvinfer_plugin_LIBRARY)
+    list(APPEND TensorRT_LIBRARIES "${TensorRT_nvinfer_plugin_LIBRARY}")
   endif()
 
   if(NOT TARGET TensorRT::TensorRT)
     add_library(TensorRT::TensorRT INTERFACE IMPORTED)
     set_target_properties(TensorRT::TensorRT PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
-      INTERFACE_LINK_LIBRARIES "${TensorRT_LIBRARIES}")
-  endif()
-
-  message(STATUS "FindTensorRT: found TensorRT ${TensorRT_VERSION} at ${TensorRT_INCLUDE_DIR}")
-else()
-  # Non-fatal by design — Phase 0 does not need TensorRT.
-  if(TensorRT_FIND_REQUIRED)
-    message(FATAL_ERROR "FindTensorRT: TensorRT requested as REQUIRED but not found.")
-  else()
-    message(STATUS "FindTensorRT: TensorRT not found (expected & harmless in Phase 0).")
+      INTERFACE_LINK_LIBRARIES "${TensorRT_LIBRARIES}"
+    )
   endif()
 endif()
 
 mark_as_advanced(
   TensorRT_INCLUDE_DIR
   TensorRT_nvinfer_LIBRARY
-  TensorRT_nvonnxparser_LIBRARY)
-
-unset(_la_trt_roots)
-unset(_la_trt_ver_hdr)
+  TensorRT_nvonnxparser_LIBRARY
+  TensorRT_nvinfer_plugin_LIBRARY
+)

@@ -1,143 +1,88 @@
-# LocateAnything — C++/TensorRT Port
+# LocateAnything C++/TensorRT Port
 
-A C++/TensorRT port of NVIDIA **LocateAnything**.
+Phase 0 scaffold: CPU-only, TRT-free building blocks with tests.
+Phase 1 adds an opt-in TensorRT path (default OFF) plus the Python export
+pipeline that produces the ONNX / engine artifacts consumed by the C++ runtime.
 
-This directory (`cpp_trt/`) contains the native implementation. It is organized
-so that the **Phase 0** targets — the deterministic, model-free building blocks
-(config, tokenizer, image preprocessing, output decoding, vision RoPE) — build
-and test with **only a C++ toolchain**: no TensorRT, no TRT-LLM, no PyTorch, and
-no model checkpoint are required.
-
-CUDA kernels are optional and gated behind a CMake option (default **OFF**).
-Every CUDA path has a pure-C++ CPU reference that always builds, so the project
-configures and compiles even where `nvcc` and the host compiler do not
-interoperate.
-
----
-
-## Project layout
+## Layout
 
 ```
 cpp_trt/
-├── CMakeLists.txt          # root: project(locateanything_trt), C++20, options, testing
-├── cmake/
-│   └── FindTensorRT.cmake  # discovery module for later phases (UNUSED in Phase 0)
-├── docker/
-│   └── Dockerfile          # FROM nvcr.io/nvidia/tensorrt:25.06-py3 + cmake/g++/cargo
-├── src/
-│   ├── CMakeLists.txt      # aggregator: add_subdirectory for each module below
-│   ├── config/             # (owned by another agent)
-│   ├── tokenizer/          # (owned by another agent)
-│   ├── preprocess/         # (owned by another agent)
-│   ├── decode/             # (owned by another agent)
-│   └── vision_rope/        # (owned by another agent)
-├── tests/
-│   └── CMakeLists.txt      # placeholder (test agent owns the rest of tests/)
-├── .gitignore
-└── README.md               # this file
+  src/
+    config/      # runtime config structs + JSON parse
+    tokenizer/   # BPE/SentencePiece-ish tokenizer port
+    preprocess/  # image preprocessing (letterbox, normalize)
+    decode/      # box/point decode utilities
+    vision_rope/ # 2D rotary position embedding tables
+    vision/      # TensorRT engine wrapper + end-to-end pipeline (LA_BUILD_TRT)
+  tests/         # gtest unit tests (76 cases)
+  export/        # Python export pipeline (PyTorch -> ONNX -> TRT engine)
+  cmake/         # FindTensorRT.cmake
+  docker/        # build image (TRT 10.11)
 ```
 
-### Modules (`src/`)
-
-| Module        | Purpose |
-|---------------|---------|
-| `config`      | Model / runtime configuration: hyperparameters, image and grid sizes, special token ids, paths. The single source of truth other modules read. |
-| `tokenizer`   | Text tokenization / detokenization for the prompt and model output (encode/decode, special tokens). |
-| `preprocess`  | Image preprocessing: resize, normalize, layout conversion (HWC→CHW), and packing into the model input tensor. |
-| `decode`      | Output decoding: turning raw model logits / coordinate predictions into structured detections (boxes / points), including any coordinate-token parsing. |
-| `vision_rope` | Vision rotary positional embeddings (RoPE) used by the vision tower — frequency tables and the rotation applied to patch embeddings. |
-
-Each module is an independent static library (conventionally `la_<module>`) and
-may ship a CPU reference plus, in later phases, an optional CUDA kernel.
-
----
-
-## Include directory convention
-
-Every module exposes its **public** headers under:
-
-```
-cpp_trt/src/<module>/include/la/<module>/
-```
-
-A module's `CMakeLists.txt` therefore does:
-
-```cmake
-target_include_directories(la_<module> PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
-```
-
-and consumers include headers with the fully-qualified path, e.g.:
-
-```cpp
-#include "la/config/config.hpp"
-#include "la/tokenizer/tokenizer.hpp"
-#include "la/preprocess/preprocess.hpp"
-#include "la/decode/decode.hpp"
-#include "la/vision_rope/vision_rope.hpp"
-```
-
-The `la/<module>/` prefix keeps the include namespace collision-free and makes
-the owning module obvious at every use site.
-
----
-
-## Build instructions (Phase 0, no TensorRT)
-
-Phase 0 targets need only CMake (≥ 3.20) and a C++20 compiler. GoogleTest is
-required to configure the test tree (`BUILD_TESTING=ON` by default).
-
-From inside `cpp_trt/`:
+## Build (default: TRT-free)
 
 ```bash
-# Configure
-cmake -B build -S .
-
-# Build
-cmake --build build
-
-# Test
+cmake -B build -S . -DLA_BUILD_CUDA=OFF -DBUILD_TESTING=ON
+cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-To skip tests entirely:
+All 76 tests pass with no TensorRT, CUDA, or PyTorch installed. This is the
+default configuration: `LA_BUILD_TRT` is OFF, so `cmake/FindTensorRT.cmake` is
+never invoked and `src/vision/` is not descended into.
+
+## Build options
+
+| Option          | Default | Effect                                                              |
+| --------------- | ------- | ------------------------------------------------------------------- |
+| `BUILD_TESTING` | `ON`    | Build the gtest unit tests (76 cases).                              |
+| `LA_BUILD_CUDA` | `OFF`   | Enable the CUDA language and CUDA-dependent targets.                |
+| `LA_BUILD_TRT`  | `OFF`   | Find TensorRT and build the TRT-dependent vision targets.           |
+
+### LA_BUILD_TRT
+
+When `LA_BUILD_TRT=ON` the root `CMakeLists.txt` runs
+`find_package(TensorRT REQUIRED)` (see `cmake/FindTensorRT.cmake`) and
+`src/CMakeLists.txt` descends into `src/vision/` (added AFTER the Phase 0
+modules so targets such as `la_vision_rope` are available to link). When OFF,
+none of the TensorRT machinery is touched and the build stays exactly as in
+Phase 0.
 
 ```bash
-cmake -B build -S . -DBUILD_TESTING=OFF
-cmake --build build
+# TRT-enabled build (requires a TensorRT 10.x install)
+cmake -B build -S . \
+  -DLA_BUILD_CUDA=ON \
+  -DLA_BUILD_TRT=ON \
+  -DTensorRT_ROOT=/usr/local/tensorrt \
+  -DBUILD_TESTING=ON
+cmake --build build -j
 ```
 
-### CMake options
+`FindTensorRT.cmake` locates `nvinfer`, `nvonnxparser`, and (optionally)
+`nvinfer_plugin` plus `NvInfer.h`, honoring `-DTensorRT_ROOT=...` (or the
+`TensorRT_ROOT` / `TENSORRT_ROOT` environment variables) before falling back to
+the CUDA toolkit root and standard system locations. On success it sets
+`TensorRT_FOUND`, `TensorRT_INCLUDE_DIRS`, `TensorRT_LIBRARIES`, and the
+imported target `TensorRT::TensorRT`.
 
-| Option          | Default | Meaning |
-|-----------------|---------|---------|
-| `LA_BUILD_CUDA` | `OFF`   | Build optional CUDA kernels (Phase 1+; requires `nvcc`). When OFF, only the pure-C++ CPU references build. |
-| `BUILD_TESTING` | `ON`    | Build and register the unit tests. |
+## Export pipeline (Python)
 
-> Enabling `LA_BUILD_CUDA` calls `enable_language(CUDA)`. On a host where
-> `nvcc 13.1` and `gcc 15` do not interoperate, leave this **OFF** — the CPU
-> references provide identical behavior for Phase 0.
+The `export/` directory holds the Python code that converts the LocateAnything
+checkpoint into the artifacts the C++/TRT runtime loads (ONNX, then a
+serialized TensorRT engine). It is written against the real checkpoint and is
+intended to be run on a machine that has PyTorch, the checkpoint, and TensorRT
+available — not as part of the C++ build.
 
----
+See `export/README.md` for the full, authoritative run order, required
+environment, and the exact commands for each stage of the
+PyTorch -> ONNX -> TensorRT engine conversion.
 
-## Phase 0 vs later phases
+## Status
 
-- **Phase 0 (this scaffolding):** pure-C++ modules; deterministic, unit-tested
-  in isolation. No TensorRT / TRT-LLM / PyTorch / checkpoint dependency.
-- **Phase 1+:** ONNX export, TensorRT engine build, and the inference runtime.
-  These use `cmake/FindTensorRT.cmake`, optionally `-DLA_BUILD_CUDA=ON`, and the
-  TensorRT container in `docker/Dockerfile`. Building **TRT-LLM 0.20**
-  (pinned at commit `7c828d7`) is part of that later phase, not Phase 0.
-
----
-
-## Docker
-
-`docker/Dockerfile` is based on `nvcr.io/nvidia/tensorrt:25.06-py3` and adds the
-C++ toolchain (`cmake`, `build-essential`), `ninja`, and Rust/`cargo`. It builds
-the Phase 0 targets as-is and provides TensorRT for later phases. TRT-LLM is not
-built in this image (later phase).
-
-```bash
-docker build -t locateanything-trt -f cpp_trt/docker/Dockerfile .
+- [x] Phase 0: CPU building blocks + tests (76 cases, TRT-free default).
+- [ ] Phase 1: TensorRT engine wrapper + end-to-end pipeline (`LA_BUILD_TRT`),
+      Python export pipeline (`export/`).
+- [ ] Later phase: TensorRT-LLM integration.
 ```

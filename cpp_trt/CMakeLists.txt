@@ -20,6 +20,7 @@ project(locateanything_trt
 # Options
 # ----------------------------------------------------------------------------
 option(LA_BUILD_CUDA "build CUDA kernels (Phase 1+; requires nvcc)" OFF)
+option(LA_BUILD_TRT "build TensorRT-dependent targets" OFF)
 option(BUILD_TESTING "build unit tests" ON)
 
 # ----------------------------------------------------------------------------
@@ -33,8 +34,24 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
 endif()
 
-# Local cmake modules (FindTensorRT.cmake lives here; unused in Phase 0).
+# Local cmake modules (FindTensorRT.cmake lives here).
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# ----------------------------------------------------------------------------
+# Optional TensorRT discovery
+#   TensorRT is OFF by default. The default (Phase 0) build is fully TRT-free:
+#   FindTensorRT.cmake is ONLY invoked when LA_BUILD_TRT=ON, so a host with no
+#   TensorRT installed still configures and builds the 76 unit tests. The
+#   TRT-dependent targets live under src/vision/ and are guarded by this option
+#   there as well.
+# ----------------------------------------------------------------------------
+if(LA_BUILD_TRT)
+  find_package(TensorRT REQUIRED)
+  message(STATUS "LA_BUILD_TRT=ON: TensorRT ${TensorRT_VERSION} found; "
+                 "building TRT-dependent targets.")
+else()
+  message(STATUS "LA_BUILD_TRT=OFF: TRT-dependent targets are excluded.")
+endif()
 
 # ----------------------------------------------------------------------------
 # Optional CUDA language enablement
