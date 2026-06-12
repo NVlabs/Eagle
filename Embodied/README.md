@@ -148,7 +148,7 @@ pip install -r requirements.txt
 pip install --no-build-isolation .
 ```
 
-> For non-Hopper/Blackwell GPUs (A100, L40, etc.), use `--attn_implementation sdpa`, which only supports sequences up to ~4K tokens.
+> For non-Hopper/Blackwell GPUs (A100, L40, etc.), the Hugging Face model release also includes the `la_flash` batch runtime described below. It uses FlashAttention varlen sparse range plans and avoids the dense SDPA masks used by the stock path.
 
 </details>
 
@@ -181,6 +181,64 @@ print(worker.point(img, "the traffic light")["answer"])
 ```
 
 See [`locateanything_worker.py`](locateanything_worker.py) for the full worker API.
+
+## 🚀 Batch Inference Release
+
+The [Hugging Face model repository](https://huggingface.co/nvidia/LocateAnything-3B) now includes optional high-throughput inference utilities:
+
+- `batch_infer.py`: JSONL/image-query batch inference CLI.
+- `batch_utils/`: batched hybrid MTP/NTP scheduler and sampling runtime.
+- `kernel_utils/`: **LA Flash** sparse range utilities implemented with FlashAttention varlen. This path does not build or ship a custom C++/CUDA extension.
+
+`LA_FLASH_ATTN=la_flash` keeps LocateAnything's hybrid decoding path while running sparse range plans through FlashAttention. It is intended for inference/evaluation; training should continue to use the standard model code path.
+
+```bash
+hf download nvidia/LocateAnything-3B --local-dir LocateAnything-3B
+cd LocateAnything-3B
+export PYTHONPATH="$PWD:${PYTHONPATH:-}"
+
+python batch_infer.py \
+  --model . \
+  --attn la_flash \
+  --vision-attn flash_attention_2 \
+  --scheduler pipeline \
+  --batch-size 4 \
+  --image /path/to/image.jpg \
+  --query "person</c>car"
+```
+
+A100 4K probe, real 3840x2160 street image, `query=vehicle`, `batch_size=4`, raw PIL input, `in_token_limit=25600`, hybrid MTP inference:
+
+| Backend | Attention path | Time | Peak reserved memory |
+|:--|:--|--:|--:|
+| `sdpa` | Dense SDPA masks | 8.2600 s | 35.12 GB |
+| `la_flash` | FlashAttention sparse range plan | 8.0314 s | 11.71 GB |
+
+The worker API can also use the released batch runtime when `batch_utils/` and `kernel_utils/` are on `PYTHONPATH`:
+
+```python
+from PIL import Image
+from locateanything_worker import LocateAnythingWorker
+
+worker = LocateAnythingWorker(
+    "nvidia/LocateAnything-3B",
+    use_batch_runtime=True,
+    attn="la_flash",
+    vision_attn="flash_attention_2",
+    scheduler="pipeline",
+)
+
+img1 = Image.open("street_1.jpg").convert("RGB")
+img2 = Image.open("street_2.jpg").convert("RGB")
+
+results = worker.detect_batch([
+    (img1, ["person", "car"]),
+    (img2, ["traffic light", "bus"]),
+])
+
+for result in results:
+    print(result["answer"])
+```
 
 ### 🧾 Output Format
 
@@ -267,7 +325,6 @@ See the [Evaluation Guide](evaluation/README.md) for setup and dataset preparati
 | **ScreenSpot-Pro** | Avg | **60.3** | **+2.3** vs. GUI-Owl-32B |
 | **HumanRef** | F1@0.95 | **68.8** | **+3.4** vs. Rex-Omni |
 | **RefCOCOg val** | F1@Mean | **76.7** | **+2.0** vs. Qwen3-VL-8B |
-| **Pointing** (7 benchmarks) | — | **Best on all 7** | ✅ |
 
 </div>
 

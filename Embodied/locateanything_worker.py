@@ -9,7 +9,9 @@
 """
 locateanything_worker.py - A reusable worker for LocateAnything inference.
 """
+import os
 import re
+from typing import Optional, Union
 
 import torch
 from PIL import Image
@@ -19,9 +21,34 @@ from transformers import AutoModel, AutoTokenizer, AutoProcessor
 class LocateAnythingWorker:
     """Stateful worker that loads the model once and serves perception queries."""
 
-    def __init__(self, model_path: str, device: str = "cuda", dtype=torch.bfloat16):
+    def __init__(
+        self,
+        model_path: str,
+        device: str = "cuda",
+        dtype=torch.bfloat16,
+        use_batch_runtime: bool = False,
+        attn: str = "la_flash",
+        vision_attn: str = "auto",
+        scheduler: str = "pipeline",
+        group_size: int = 0,
+        strict_attn: bool = False,
+    ):
         self.device = device
         self.dtype = dtype
+        self.use_batch_runtime = use_batch_runtime
+        self.scheduler = scheduler
+        self.group_size = group_size
+
+        if use_batch_runtime:
+            self._init_batch_runtime(
+                model_path=model_path,
+                attn=attn,
+                vision_attn=vision_attn,
+                scheduler=scheduler,
+                group_size=group_size,
+                strict_attn=strict_attn,
+            )
+            return
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
@@ -31,6 +58,44 @@ class LocateAnythingWorker:
             trust_remote_code=True,
         ).to(device).eval()
 
+    def _init_batch_runtime(
+        self,
+        model_path: str,
+        attn: str,
+        vision_attn: str,
+        scheduler: str,
+        group_size: int,
+        strict_attn: bool,
+    ) -> None:
+        """Initialize the optional HF-release batch runtime.
+
+        The batch runtime is shipped with the Hugging Face model repository as
+        `batch_utils` and `kernel_utils`. It uses FlashAttention varlen sparse
+        range plans for `attn="la_flash"` and does not build a local CUDA
+        extension.
+        """
+        os.environ["LA_FLASH_MODEL"] = model_path
+        os.environ["LA_FLASH_ATTN"] = attn
+        os.environ["LA_FLASH_VISION_ATTN"] = vision_attn
+        os.environ["LA_FLASH_HYBRID_SCHEDULER"] = scheduler
+        os.environ["LA_FLASH_HYBRID_GROUP_SIZE"] = str(group_size)
+        if strict_attn:
+            os.environ["LA_FLASH_STRICT_ATTN"] = "1"
+
+        try:
+            from batch_utils import generate_batch_hybrid, get_last_hybrid_stats, load
+        except ImportError as exc:
+            raise ImportError(
+                "Batch inference requires the Hugging Face release files "
+                "`batch_utils/` and `kernel_utils/` on PYTHONPATH. Download "
+                "nvidia/LocateAnything-3B and run from that directory, or add "
+                "the model directory to PYTHONPATH."
+            ) from exc
+
+        self._batch_generate = generate_batch_hybrid
+        self._batch_stats = get_last_hybrid_stats
+        self.tokenizer, self.processor, self.model = load()
+
     @torch.no_grad()
     def predict(
         self,
@@ -39,6 +104,9 @@ class LocateAnythingWorker:
         generation_mode: str = "hybrid",
         max_new_tokens: int = 2048,
         temperature: float = 0.7,
+        top_p: float = 0.9,
+        top_k: int = 0,
+        repetition_penalty: float = 1.1,
         verbose: bool = True,
     ) -> dict:
         """
@@ -50,11 +118,26 @@ class LocateAnythingWorker:
             generation_mode: "fast" (MTP) | "slow" (NTP) | "hybrid".
             max_new_tokens: Maximum tokens to generate.
             temperature: Sampling temperature (0 = greedy).
+            top_p: Nucleus sampling probability.
+            top_k: Top-k sampling cutoff; 0 disables top-k.
+            repetition_penalty: Repetition penalty used by the model sampler.
             verbose: If True, return timing statistics.
 
         Returns:
             dict with keys: "answer", "stats" (optional), "history" (optional).
         """
+        if self.use_batch_runtime:
+            return self.predict_batch(
+                [(image, question)],
+                generation_mode=generation_mode,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                repetition_penalty=repetition_penalty,
+                verbose=verbose,
+            )[0]
+
         messages = [
             {"role": "user", "content": [
                 {"type": "image", "image": image},
@@ -85,8 +168,9 @@ class LocateAnythingWorker:
             generation_mode=generation_mode,
             temperature=temperature,
             do_sample=True,
-            top_p=0.9,
-            repetition_penalty=1.1,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
             verbose=verbose,
         )
 
@@ -96,6 +180,75 @@ class LocateAnythingWorker:
             result["stats"] = response[2]
         return result
 
+    @torch.no_grad()
+    def predict_batch(
+        self,
+        requests: list[Union[tuple[Image.Image, str], dict]],
+        generation_mode: str = "hybrid",
+        max_new_tokens: int = 2048,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        top_k: int = 0,
+        repetition_penalty: float = 1.1,
+        scheduler: Optional[str] = None,
+        group_size: Optional[int] = None,
+        verbose: bool = True,
+    ) -> list[dict]:
+        """Run a batch of `(image, question)` perception queries.
+
+        When `use_batch_runtime=True`, this uses the released `batch_utils`
+        hybrid scheduler. Otherwise it falls back to serial calls to
+        `predict()` for compatibility.
+        """
+        pairs = []
+        for item in requests:
+            if isinstance(item, dict):
+                image = item["image"]
+                question = item.get("question", item.get("prompt"))
+                if question is None:
+                    raise ValueError("batch request dict must contain `question` or `prompt`")
+            else:
+                image, question = item
+            pairs.append((image, question))
+
+        if not self.use_batch_runtime:
+            return [
+                self.predict(
+                    image,
+                    question,
+                    generation_mode=generation_mode,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                    repetition_penalty=repetition_penalty,
+                    verbose=verbose,
+                )
+                for image, question in pairs
+            ]
+
+        if generation_mode != "hybrid":
+            raise ValueError("batch runtime currently supports generation_mode='hybrid'")
+
+        answers = self._batch_generate(
+            pairs,
+            temperature=temperature,
+            top_p=None if top_p < 0 else top_p,
+            top_k=None if top_k <= 0 else top_k,
+            repetition_penalty=repetition_penalty,
+            max_new_tokens=max_new_tokens,
+            scheduler=self.scheduler if scheduler is None else scheduler,
+            group_size=self.group_size if group_size is None else group_size,
+        )
+        stats = self._batch_stats() if verbose else None
+        results = []
+        for answer in answers:
+            row = {"answer": answer}
+            if stats is not None:
+                row["stats"] = stats
+            results.append(row)
+        return results
+
     # ---- Convenience methods for each task ----
 
     def detect(self, image: Image.Image, categories: list[str], **kwargs) -> dict:
@@ -103,6 +256,20 @@ class LocateAnythingWorker:
         cats = "</c>".join(categories)
         prompt = f"Locate all the instances that matches the following description: {cats}."
         return self.predict(image, prompt, **kwargs)
+
+    def detect_batch(self, requests: list[tuple[Image.Image, Union[list[str], str]]], **kwargs) -> list[dict]:
+        """Batch object detection.
+
+        Args:
+            requests: list of `(image, categories)` pairs. `categories` can be
+                either a list of labels or a pre-joined `"</c>"` string.
+        """
+        pairs = []
+        for image, categories in requests:
+            cats = categories if isinstance(categories, str) else "</c>".join(categories)
+            prompt = f"Locate all the instances that matches the following description: {cats}."
+            pairs.append((image, prompt))
+        return self.predict_batch(pairs, **kwargs)
 
     def ground_single(self, image: Image.Image, phrase: str, **kwargs) -> dict:
         """Phrase grounding — single instance."""
@@ -198,3 +365,17 @@ if __name__ == "__main__":
     w, h = img.size
     boxes = LocateAnythingWorker.parse_boxes(result["answer"], w, h)
     print("Parsed boxes:", boxes)
+
+    # Optional batch runtime from the Hugging Face release. Run from the
+    # downloaded model directory, or add that directory to PYTHONPATH.
+    batch_worker = LocateAnythingWorker(
+        "nvidia/LocateAnything-3B",
+        use_batch_runtime=True,
+        attn="la_flash",
+        scheduler="pipeline",
+    )
+    batch_results = batch_worker.detect_batch([
+        (img, ["person", "car"]),
+        (img, ["traffic light"]),
+    ])
+    print("Batch Detection:", [row["answer"] for row in batch_results])

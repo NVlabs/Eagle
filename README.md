@@ -11,12 +11,13 @@
 
 [[📘Eagle Report](Eagle/Eagle.pdf)] [[📘Eagle 2 Report](Eagle2_5/Eagle2.pdf)] [[📘Eagle 2.5 Report](Eagle2_5/Eagle2.5.pdf)] [[📘LocateAnything Report](https://research.nvidia.com/labs/lpr/locate-anything/LocateAnything.pdf)]
 
-[[🤗Model Collection](https://huggingface.co/collections/nvidia/eagle)] [[🤗LocateAnything Demo](https://huggingface.co/spaces/nvidia/Eagle-2.5-8B-demo)] [[🌐Project Page](https://nvlabs.github.io/Eagle/)]
+[[🤗Model Collection](https://huggingface.co/collections/nvidia/eagle)] [[🤗LocateAnything Demo](https://huggingface.co/spaces/nvidia/LocateAnything)] [[🌐Project Page](https://nvlabs.github.io/Eagle/)]
 
 </div>
 
 
 ## Updates
+- [2026/06] 🔥 LocateAnything now supports [batch inference](./Embodied/) with a pure FlashAttention runtime — efficient inference on A100, RTX 4090, and other non-Hopper/Blackwell GPUs.
 - [2026/05] 🔥 Release [LocateAnything](./Embodied/) — A generalist vision-language grounding model based on Eagle.
 - [2025/12] 🎉 A native resolution variant of the Eagle model is adopted as the VLM backbone of [GR00T-N1.6](https://huggingface.co/collections/nvidia/gr00t-n16). Check out the [tech blog](https://research.nvidia.com/labs/gear/gr00t-n1_6/) for more details.
 - [2025/10] 🔥 Release Eagle 2.5 [source code](https://github.com/NVlabs/EAGLE/tree/main/Eagle2_5).
