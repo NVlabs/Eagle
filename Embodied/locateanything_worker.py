@@ -157,6 +157,9 @@ class LocateAnythingWorker:
         input_ids = inputs["input_ids"]
         image_grid_hws = inputs.get("image_grid_hws", None)
 
+        # Fix applied here: Normalize top_k before passing to generate
+        top_k_for_generate = None if top_k <= 0 else top_k
+
         response = self.model.generate(
             pixel_values=pixel_values,
             input_ids=input_ids,
@@ -169,7 +172,7 @@ class LocateAnythingWorker:
             temperature=temperature,
             do_sample=True,
             top_p=top_p,
-            top_k=top_k,
+            top_k=top_k_for_generate, # Updated parameter
             repetition_penalty=repetition_penalty,
             verbose=verbose,
         )
