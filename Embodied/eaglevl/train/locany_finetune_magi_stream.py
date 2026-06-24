@@ -216,6 +216,7 @@ class LazySupervisedDatasetMTP(Dataset):
         self.video_total_pixels = video_total_pixels
         self.block_size = block_size
         self.data_augment = meta.get("data_augment", False)
+        self.visual_prompt = bool(meta.get("visual_prompt", False))
 
         ann_paths = meta["annotation"]
         if not isinstance(ann_paths, (list, tuple)):
@@ -228,7 +229,10 @@ class LazySupervisedDatasetMTP(Dataset):
         logger.info(f"[Dataset] {self.ds_name} Indexing done in {time.time() - start_time:.2f}s.")
         
         original_num_rows = len(self.lazy_loader)
-        logger.info(f"[Dataset] {self.ds_name} Found {original_num_rows} samples.")
+        logger.info(
+            f"[Dataset] {self.ds_name} Found {original_num_rows} samples. "
+            f"visual_prompt={self.visual_prompt}"
+        )
         self.active_indices = list(range(original_num_rows))
         
         if repeat_time < 1:
@@ -474,6 +478,38 @@ class LazySupervisedDatasetMTP(Dataset):
             position_ids=position_ids,
         )
 
+    def _validate_image_token_alignment(self, input_ids: torch.Tensor, pixel_values, image_grid_hws) -> None:
+        image_token_id = getattr(self.processor, "image_token_id", None)
+        if image_token_id is None:
+            image_token = getattr(self.processor, "image_token", IMG_CONTEXT_TOKEN)
+            image_token_id = self.processor.tokenizer.convert_tokens_to_ids(image_token)
+
+        if isinstance(image_grid_hws, torch.Tensor):
+            grid_array = image_grid_hws.detach().cpu().numpy()
+        else:
+            grid_array = np.asarray(image_grid_hws)
+
+        merge_kernel = getattr(self.processor.image_processor, "merge_kernel_size", [2, 2])
+        expected_context_tokens = int(
+            sum(int(h) * int(w) // (int(merge_kernel[0]) * int(merge_kernel[1])) for h, w in grid_array)
+        )
+        actual_context_tokens = int((input_ids == image_token_id).sum().item())
+        if actual_context_tokens != expected_context_tokens:
+            raise ValueError(
+                f"[{self.ds_name}] image token mismatch: actual={actual_context_tokens}, "
+                f"expected={expected_context_tokens}, num_images={len(grid_array)}, "
+                f"grid_hws={grid_array.tolist()}"
+            )
+
+        expected_patches = int(sum(int(h) * int(w) for h, w in grid_array))
+        actual_patches = int(pixel_values.shape[0])
+        if actual_patches != expected_patches:
+            raise ValueError(
+                f"[{self.ds_name}] pixel patch mismatch: actual={actual_patches}, "
+                f"expected={expected_patches}, num_images={len(grid_array)}, "
+                f"grid_hws={grid_array.tolist()}"
+            )
+
     def multi_modal_get_item(self, messages: list) -> Dict[str, torch.Tensor]:
         message_text = self.processor.py_apply_chat_template(messages, tokenize=False)
         image_inputs, video_inputs = self.processor.process_vision_info(messages)
@@ -500,6 +536,7 @@ class LazySupervisedDatasetMTP(Dataset):
             pixel_values = inputs["pixel_values"]
             image_grid_hws = inputs["image_grid_hws"]
             image_flags = torch.tensor([len(inputs["image_grid_hws"])], dtype=torch.long)
+            self._validate_image_token_alignment(input_ids, pixel_values, image_grid_hws)
 
         labels_dict = self.get_targets_flag_with_mtp(input_ids)
         
@@ -527,7 +564,8 @@ class LazySupervisedDatasetMTP(Dataset):
                 data_item = self.lazy_loader[real_idx]
                 data_item = process_multimodal_sample(
                     data_item, self.root, self.max_frames, 
-                    self.target_fps, self.video_total_pixels
+                    self.target_fps, self.video_total_pixels,
+                    visual_prompt=self.visual_prompt,
                 )
                 return self.multi_modal_get_item(data_item)
             except Exception as e:
@@ -1573,4 +1611,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

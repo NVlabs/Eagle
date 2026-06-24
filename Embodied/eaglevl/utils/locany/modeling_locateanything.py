@@ -209,7 +209,9 @@ class LocateAnythingForConditionalGeneration(LocateAnythingPreTrainedModel, Gene
         vit_embeds = self.extract_feature(pixel_values, image_grid_hws)
             
         B, N, C = input_embeds.shape
-        input_embeds = input_embeds.reshape(B * N, C)
+        # LoRA's input-gradient hook can make embedding outputs leaf tensors.
+        # Clone before indexed writes so the same path works with and without LoRA.
+        input_embeds = input_embeds.reshape(B * N, C).clone()
 
         if has_images:
             filtered_vit_embeds = []

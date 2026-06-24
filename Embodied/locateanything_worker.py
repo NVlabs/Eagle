@@ -11,7 +11,7 @@ locateanything_worker.py - A reusable worker for LocateAnything inference.
 """
 import os
 import re
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import torch
 from PIL import Image
@@ -96,6 +96,148 @@ class LocateAnythingWorker:
         self._batch_stats = get_last_hybrid_stats
         self.tokenizer, self.processor, self.model = load()
 
+    @staticmethod
+    def _crop_visual_prompt(
+        image: Image.Image,
+        box: Sequence[float],
+        box_format: str = "normalized_1000",
+    ) -> Image.Image:
+        if len(box) != 4:
+            raise ValueError("visual_prompt_box must contain four coordinates")
+
+        w, h = image.size
+        x1, y1, x2, y2 = [float(v) for v in box]
+        if box_format == "normalized_1000":
+            left = x1 / 1000 * w
+            top = y1 / 1000 * h
+            right = x2 / 1000 * w
+            bottom = y2 / 1000 * h
+        elif box_format == "normalized_1":
+            left = x1 * w
+            top = y1 * h
+            right = x2 * w
+            bottom = y2 * h
+        elif box_format == "pixel":
+            left, top, right, bottom = x1, y1, x2, y2
+        else:
+            raise ValueError("box_format must be 'normalized_1000', 'normalized_1', or 'pixel'")
+
+        left = max(0, min(w - 1, round(left)))
+        top = max(0, min(h - 1, round(top)))
+        right = max(left + 1, min(w, round(right)))
+        bottom = max(top + 1, min(h, round(bottom)))
+        return image.crop((left, top, right, bottom)).convert("RGB")
+
+    @staticmethod
+    def _replace_visual_prompt_text(
+        question: str,
+        placeholder: str,
+        replace_text: Optional[str],
+    ) -> str:
+        if replace_text:
+            if replace_text not in question:
+                raise ValueError(f"replace_text={replace_text!r} was not found in question")
+            return question.replace(replace_text, placeholder, 1)
+
+        for marker in ("<visual_prompt>", "{visual_prompt}"):
+            if marker in question:
+                return question.replace(marker, placeholder, 1)
+
+        return f"{question}\nVisual prompt: {placeholder}"
+
+    def _build_messages(
+        self,
+        image: Image.Image,
+        question: str,
+        visual_prompt: Optional[Union[Image.Image, Sequence[Image.Image]]] = None,
+        visual_prompt_box: Optional[Sequence[float]] = None,
+        visual_prompt_box_format: str = "normalized_1000",
+        replace_text: Optional[str] = None,
+    ) -> list[dict]:
+        visual_prompts = []
+        if visual_prompt_box is not None:
+            visual_prompts.append(
+                self._crop_visual_prompt(image, visual_prompt_box, visual_prompt_box_format)
+            )
+        if visual_prompt is not None:
+            if isinstance(visual_prompt, Image.Image):
+                visual_prompts.append(visual_prompt.convert("RGB"))
+            else:
+                visual_prompts.extend(img.convert("RGB") for img in visual_prompt)
+
+        if visual_prompts:
+            question = self._replace_visual_prompt_text(question, "<image-2>", replace_text)
+
+        content = [
+            {"type": "image", "image": image},
+            {"type": "text", "text": question},
+        ]
+        content.extend({"type": "image", "image": prompt_image} for prompt_image in visual_prompts)
+        return [{"role": "user", "content": content}]
+
+    @torch.no_grad()
+    def _predict_standard(
+        self,
+        image: Image.Image,
+        question: str,
+        generation_mode: str,
+        max_new_tokens: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        repetition_penalty: float,
+        verbose: bool,
+        visual_prompt: Optional[Union[Image.Image, Sequence[Image.Image]]] = None,
+        visual_prompt_box: Optional[Sequence[float]] = None,
+        visual_prompt_box_format: str = "normalized_1000",
+        replace_text: Optional[str] = None,
+    ) -> dict:
+        messages = self._build_messages(
+            image=image,
+            question=question,
+            visual_prompt=visual_prompt,
+            visual_prompt_box=visual_prompt_box,
+            visual_prompt_box_format=visual_prompt_box_format,
+            replace_text=replace_text,
+        )
+
+        text = self.processor.py_apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        images, videos = self.processor.process_vision_info(messages)
+        inputs = self.processor(
+            text=[text], images=images, videos=videos, return_tensors="pt"
+        ).to(self.device)
+
+        pixel_values = inputs["pixel_values"].to(self.dtype)
+        input_ids = inputs["input_ids"]
+        image_grid_hws = inputs.get("image_grid_hws", None)
+
+        top_k_for_generate = None if top_k <= 0 else top_k
+
+        response = self.model.generate(
+            pixel_values=pixel_values,
+            input_ids=input_ids,
+            attention_mask=inputs["attention_mask"],
+            image_grid_hws=image_grid_hws,
+            tokenizer=self.tokenizer,
+            max_new_tokens=max_new_tokens,
+            use_cache=True,
+            generation_mode=generation_mode,
+            temperature=temperature,
+            do_sample=True,
+            top_p=top_p,
+            top_k=top_k_for_generate,
+            repetition_penalty=repetition_penalty,
+            verbose=verbose,
+        )
+
+        result = {"answer": response[0] if isinstance(response, tuple) else response}
+        if isinstance(response, tuple) and len(response) >= 3:
+            result["history"] = response[1]
+            result["stats"] = response[2]
+        return result
+
     @torch.no_grad()
     def predict(
         self,
@@ -108,6 +250,10 @@ class LocateAnythingWorker:
         top_k: int = 0,
         repetition_penalty: float = 1.1,
         verbose: bool = True,
+        visual_prompt: Optional[Union[Image.Image, Sequence[Image.Image]]] = None,
+        visual_prompt_box: Optional[Sequence[float]] = None,
+        visual_prompt_box_format: str = "normalized_1000",
+        replace_text: Optional[str] = None,
     ) -> dict:
         """
         Run a single perception query.
@@ -122,11 +268,19 @@ class LocateAnythingWorker:
             top_k: Top-k sampling cutoff; 0 disables top-k.
             repetition_penalty: Repetition penalty used by the model sampler.
             verbose: If True, return timing statistics.
+            visual_prompt: Optional cropped/reference image prompt. It is inserted
+                as image-2 and can replace `replace_text`, `<visual_prompt>`, or
+                `{visual_prompt}` in the question.
+            visual_prompt_box: Optional box cropped from `image` and used as the
+                visual prompt. By default coordinates are normalized to 0-1000.
+            visual_prompt_box_format: "normalized_1000", "normalized_1", or "pixel".
+            replace_text: Exact text in `question` to replace with image-2.
 
         Returns:
             dict with keys: "answer", "stats" (optional), "history" (optional).
         """
-        if self.use_batch_runtime:
+        has_visual_prompt = visual_prompt is not None or visual_prompt_box is not None
+        if self.use_batch_runtime and not has_visual_prompt:
             return self.predict_batch(
                 [(image, question)],
                 generation_mode=generation_mode,
@@ -138,47 +292,21 @@ class LocateAnythingWorker:
                 verbose=verbose,
             )[0]
 
-        messages = [
-            {"role": "user", "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": question},
-            ]}
-        ]
-
-        text = self.processor.py_apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        images, videos = self.processor.process_vision_info(messages)
-        inputs = self.processor(
-            text=[text], images=images, videos=videos, return_tensors="pt"
-        ).to(self.device)
-
-        pixel_values = inputs["pixel_values"].to(self.dtype)
-        input_ids = inputs["input_ids"]
-        image_grid_hws = inputs.get("image_grid_hws", None)
-
-        response = self.model.generate(
-            pixel_values=pixel_values,
-            input_ids=input_ids,
-            attention_mask=inputs["attention_mask"],
-            image_grid_hws=image_grid_hws,
-            tokenizer=self.tokenizer,
-            max_new_tokens=max_new_tokens,
-            use_cache=True,
+        return self._predict_standard(
+            image=image,
+            question=question,
             generation_mode=generation_mode,
+            max_new_tokens=max_new_tokens,
             temperature=temperature,
-            do_sample=True,
             top_p=top_p,
             top_k=top_k,
             repetition_penalty=repetition_penalty,
             verbose=verbose,
+            visual_prompt=visual_prompt,
+            visual_prompt_box=visual_prompt_box,
+            visual_prompt_box_format=visual_prompt_box_format,
+            replace_text=replace_text,
         )
-
-        result = {"answer": response[0] if isinstance(response, tuple) else response}
-        if isinstance(response, tuple) and len(response) >= 3:
-            result["history"] = response[1]
-            result["stats"] = response[2]
-        return result
 
     @torch.no_grad()
     def predict_batch(
@@ -200,22 +328,50 @@ class LocateAnythingWorker:
         hybrid scheduler. Otherwise it falls back to serial calls to
         `predict()` for compatibility.
         """
-        pairs = []
+        rows = []
+        has_visual_prompt = False
         for item in requests:
             if isinstance(item, dict):
                 image = item["image"]
                 question = item.get("question", item.get("prompt"))
                 if question is None:
                     raise ValueError("batch request dict must contain `question` or `prompt`")
+                visual_prompt = item.get("visual_prompt", item.get("visual_prompt_image"))
+                visual_prompt_box = item.get("visual_prompt_box")
+                visual_prompt_box_format = item.get("visual_prompt_box_format", "normalized_1000")
+                replace_text = item.get("replace_text")
             else:
-                image, question = item
-            pairs.append((image, question))
+                if len(item) == 2:
+                    image, question = item
+                    visual_prompt = None
+                    visual_prompt_box = None
+                    visual_prompt_box_format = "normalized_1000"
+                    replace_text = None
+                elif len(item) == 3:
+                    image, question, visual_prompt = item
+                    visual_prompt_box = None
+                    visual_prompt_box_format = "normalized_1000"
+                    replace_text = None
+                else:
+                    raise ValueError("batch tuple requests must be (image, question) or (image, question, visual_prompt)")
 
-        if not self.use_batch_runtime:
+            has_visual_prompt = has_visual_prompt or visual_prompt is not None or visual_prompt_box is not None
+            rows.append(
+                {
+                    "image": image,
+                    "question": question,
+                    "visual_prompt": visual_prompt,
+                    "visual_prompt_box": visual_prompt_box,
+                    "visual_prompt_box_format": visual_prompt_box_format,
+                    "replace_text": replace_text,
+                }
+            )
+
+        if not self.use_batch_runtime or has_visual_prompt:
             return [
-                self.predict(
-                    image,
-                    question,
+                self._predict_standard(
+                    image=row["image"],
+                    question=row["question"],
                     generation_mode=generation_mode,
                     max_new_tokens=max_new_tokens,
                     temperature=temperature,
@@ -223,15 +379,19 @@ class LocateAnythingWorker:
                     top_k=top_k,
                     repetition_penalty=repetition_penalty,
                     verbose=verbose,
+                    visual_prompt=row["visual_prompt"],
+                    visual_prompt_box=row["visual_prompt_box"],
+                    visual_prompt_box_format=row["visual_prompt_box_format"],
+                    replace_text=row["replace_text"],
                 )
-                for image, question in pairs
+                for row in rows
             ]
 
         if generation_mode != "hybrid":
             raise ValueError("batch runtime currently supports generation_mode='hybrid'")
 
         answers = self._batch_generate(
-            pairs,
+            [(row["image"], row["question"]) for row in rows],
             temperature=temperature,
             top_p=None if top_p < 0 else top_p,
             top_k=None if top_k <= 0 else top_k,
@@ -256,6 +416,33 @@ class LocateAnythingWorker:
         cats = "</c>".join(categories)
         prompt = f"Locate all the instances that matches the following description: {cats}."
         return self.predict(image, prompt, **kwargs)
+
+    def detect_visual_prompt(
+        self,
+        image: Image.Image,
+        visual_prompt: Optional[Image.Image] = None,
+        visual_prompt_box: Optional[Sequence[float]] = None,
+        visual_prompt_box_format: str = "normalized_1000",
+        **kwargs,
+    ) -> dict:
+        """Detect objects matching a visual prompt image.
+
+        `visual_prompt_box` is cropped from `image`; by default its coordinates
+        use the model's normalized 0-1000 box format. Alternatively, pass an
+        explicit cropped/reference `visual_prompt` image.
+        """
+        if visual_prompt is None and visual_prompt_box is None:
+            raise ValueError("detect_visual_prompt requires visual_prompt or visual_prompt_box")
+
+        prompt = "Detect all the objects in the image that belong to the category set: <visual_prompt>."
+        return self.predict(
+            image,
+            prompt,
+            visual_prompt=visual_prompt,
+            visual_prompt_box=visual_prompt_box,
+            visual_prompt_box_format=visual_prompt_box_format,
+            **kwargs,
+        )
 
     def detect_batch(self, requests: list[tuple[Image.Image, Union[list[str], str]]], **kwargs) -> list[dict]:
         """Batch object detection.

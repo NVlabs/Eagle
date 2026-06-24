@@ -14,11 +14,13 @@
 
 import glob
 import json
+import logging
 import os
 import os.path as osp
 import re
 import shutil
 import time
+import copy
 from typing import List
 
 import torch
@@ -32,9 +34,17 @@ from pynvml import (
     nvmlInit,
     nvmlShutdown,
 )
+from PIL import Image
 from transformers import TrainerCallback
 from transformers.trainer_utils import get_last_checkpoint
 from .fastseek.draw_marker import DRAW_FUNCTIONS
+
+logger = logging.getLogger(__name__)
+
+_DETECTION_CATEGORY_RE = re.compile(
+    r"(Detect all the objects in the image that belong to the category set:\s*)(?P<category>.+?)(?P<suffix>\.)"
+)
+_BOX_RE = re.compile(r"<box><(\d+)><(\d+)><(\d+)><(\d+)></box>")
 
 def get_last_checkpoint_guard(folder):
     while True:
@@ -315,14 +325,160 @@ def auto_thinking_prompt_handler(conversations):
     return conversations
 
 
-def process_multimodal_sample(sample, media_root, max_frames, target_fps, video_total_pixels, auto_thinking_handler=False):
+def _as_list(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _resolve_image_path(image_info, media_root):
+    if not isinstance(image_info, str):
+        return None
+    if image_info.startswith(("http://", "https://", "file://", "data:image")):
+        return image_info
+    return osp.join(media_root, image_info)
+
+
+def _load_visual_prompt_source_image(sample, media_root):
+    raw_images = sample.get("image") if sample.get("image") is not None else sample.get("image_list")
+    image_list = _as_list(raw_images)
+    if not image_list:
+        return None, image_list
+
+    source = image_list[0]
+    if isinstance(source, Image.Image):
+        return source.convert("RGB"), image_list
+
+    image_path = _resolve_image_path(source, media_root)
+    if image_path is None or image_path.startswith(("http://", "https://", "data:image")):
+        return None, image_list
+    if image_path.startswith("file://"):
+        image_path = image_path[7:]
+
+    try:
+        return Image.open(image_path).convert("RGB"), image_list
+    except Exception as exc:
+        logger.warning("Failed to load visual prompt source image %s: %s", image_path, exc)
+        return None, image_list
+
+
+def _extract_detection_category(text):
+    match = _DETECTION_CATEGORY_RE.search(text)
+    if match is None:
+        return None, None
+
+    category = match.group("category").strip()
+    if not category or "," in category or "</c>" in category or "<image" in category:
+        return None, None
+
+    return match, category
+
+
+def _find_boxes_for_ref(answer, category):
+    ref_pattern = re.compile(rf"<ref>\s*{re.escape(category)}\s*</ref>(?P<body>.*?)(?=<ref>|$)", re.DOTALL)
+    match = ref_pattern.search(answer)
+    if match is None:
+        return []
+
+    body = match.group("body")
+    if "<box>None</box>" in body:
+        return []
+
+    boxes = []
+    for box_match in _BOX_RE.finditer(body):
+        x1, y1, x2, y2 = [int(v) for v in box_match.groups()]
+        boxes.append((x1, y1, x2, y2))
+    return boxes
+
+
+def _crop_normalized_box(image: Image.Image, box):
+    width, height = image.size
+    x1, y1, x2, y2 = box
+    left = max(0, min(width - 1, round(x1 / 1000 * width)))
+    top = max(0, min(height - 1, round(y1 / 1000 * height)))
+    right = max(left + 1, min(width, round(x2 / 1000 * width)))
+    bottom = max(top + 1, min(height, round(y2 / 1000 * height)))
+    if right <= left or bottom <= top:
+        return None
+    return image.crop((left, top, right, bottom)).convert("RGB")
+
+
+def apply_visual_prompt_to_sample(sample, media_root):
+    """Replace positive single-category detection text with cropped visual prompts.
+
+    The source image remains image-1. Each positive visual prompt crop is appended
+    as image-2, image-3, ... and the matching category text is replaced with that
+    placeholder. Negative GT answers (`<box>None</box>`) stay as text prompts.
+    """
+    sample = copy.deepcopy(sample)
+    conversations = sample.get("conversations") or []
+    if not conversations:
+        return sample
+
+    source_image, image_list = _load_visual_prompt_source_image(sample, media_root)
+    if source_image is None:
+        return sample
+
+    appended_crops = []
+    next_image_idx = len(image_list) + 1
+
+    for idx, conv in enumerate(conversations[:-1]):
+        if conv.get("from") != "human":
+            continue
+
+        next_conv = conversations[idx + 1]
+        if next_conv.get("from") != "gpt":
+            continue
+
+        match, category = _extract_detection_category(str(conv.get("value", "")))
+        if match is None:
+            continue
+
+        boxes = _find_boxes_for_ref(str(next_conv.get("value", "")), category)
+        if not boxes:
+            continue
+
+        crop = _crop_normalized_box(source_image, boxes[0])
+        if crop is None:
+            continue
+
+        placeholder = f"<image-{next_image_idx}>"
+        conv["value"] = (
+            conv["value"][:match.start("category")]
+            + placeholder
+            + conv["value"][match.end("category"):]
+        )
+        appended_crops.append(crop)
+        next_image_idx += 1
+
+    if appended_crops:
+        updated_images = image_list + appended_crops
+        sample["image"] = updated_images
+        sample.pop("image_list", None)
+
+    return sample
+
+
+def process_multimodal_sample(
+    sample,
+    media_root,
+    max_frames,
+    target_fps,
+    video_total_pixels,
+    auto_thinking_handler=False,
+    visual_prompt=False,
+):
     """
     Process a multimodal data sample and format it into the final message list.
     This function handles media path resolution, placeholder formatting, and the conversion of dialogue content.
     
     Args:
         auto_thinking_handler: Whether to auto-process thinking mode format, default False
+        visual_prompt: Whether to replace positive single-category detection text with image crops.
     """
+    if visual_prompt:
+        sample = apply_visual_prompt_to_sample(sample, media_root)
+
     conversations = sample.get('conversations', [])
     
     # If auto_thinking_handler is enabled, process conversation format
@@ -351,6 +507,8 @@ def process_multimodal_sample(sample, media_root, max_frames, target_fps, video_
         for img in image_list:
             if isinstance(img, str):
                 image_data.append(osp.join(media_root, img))
+            elif isinstance(img, Image.Image):
+                image_data.append(img.convert("RGB"))
             elif isinstance(img, dict):
                 if 'video' in img:  # Support the case where video frames are treated as images
                     video_data.append(osp.join(media_root, img['video']))

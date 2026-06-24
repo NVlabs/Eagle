@@ -201,7 +201,9 @@ class LocateAnythingForConditionalGeneration(LocateAnythingPreTrainedModel, Gene
         vit_embeds = self.extract_feature(pixel_values, image_grid_hws)
             
         B, N, C = input_embeds.shape
-        input_embeds = input_embeds.reshape(B * N, C)
+        # LoRA's input-gradient hook can make embedding outputs leaf tensors.
+        # Clone before indexed writes so the same path works with and without LoRA.
+        input_embeds = input_embeds.reshape(B * N, C).clone()
 
         if has_images:
             filtered_vit_embeds = []
@@ -220,14 +222,18 @@ class LocateAnythingForConditionalGeneration(LocateAnythingPreTrainedModel, Gene
             vit_embeds = self.mlp1(vit_embeds)
             input_ids = input_ids.reshape(B * N)
             selected = (input_ids == self.image_token_index)
-            try:
+            n_token = int(selected.sum().item())
+            n_embed = vit_embeds.shape[0]
+            if n_embed == n_token:
                 input_embeds[selected] = input_embeds[selected] * 0.0 + vit_embeds
                 ignore_flag = False
-            except Exception as e:
-                print(f'warning: {e}, input_embeds[selected].shape={input_embeds[selected].shape}, '
+            else:
+                print(f'warning: image token/feature mismatch, input_embeds[selected].shape={input_embeds[selected].shape}, '
                       f'vit_embeds.shape={vit_embeds.shape}')
-                n_token = selected.sum()
-                input_embeds[selected] = input_embeds[selected] * 0.0 + vit_embeds[:n_token]
+                n_assign = min(n_token, n_embed)
+                if n_assign > 0:
+                    selected_indices = selected.nonzero(as_tuple=False).squeeze(1)[:n_assign]
+                    input_embeds[selected_indices] = input_embeds[selected_indices] * 0.0 + vit_embeds[:n_assign]
                 ignore_flag = True
         else:
             ignore_flag = False
@@ -395,4 +401,3 @@ class LocateAnythingForConditionalGeneration(LocateAnythingPreTrainedModel, Gene
     # Copied from transformers.models.llava_next.modeling_llava_next.LlavaNextForConditionalGeneration.get_decoder
     def get_decoder(self):
         return self.language_model.get_decoder()
-
