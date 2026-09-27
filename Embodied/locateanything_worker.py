@@ -15,7 +15,7 @@ from typing import Optional, Sequence, Union
 
 import torch
 from PIL import Image
-from transformers import AutoModel, AutoTokenizer, AutoProcessor
+from transformers import AutoConfig, AutoModel, AutoTokenizer, AutoProcessor
 
 
 class LocateAnythingWorker:
@@ -27,7 +27,7 @@ class LocateAnythingWorker:
         device: str = "cuda",
         dtype=torch.bfloat16,
         use_batch_runtime: bool = False,
-        attn: str = "la_flash",
+        attn: Optional[str] = None,
         vision_attn: str = "auto",
         scheduler: str = "pipeline",
         group_size: int = 0,
@@ -42,7 +42,7 @@ class LocateAnythingWorker:
         if use_batch_runtime:
             self._init_batch_runtime(
                 model_path=model_path,
-                attn=attn,
+                attn=attn if attn is not None else "la_flash",
                 vision_attn=vision_attn,
                 scheduler=scheduler,
                 group_size=group_size,
@@ -50,13 +50,31 @@ class LocateAnythingWorker:
             )
             return
 
+        if attn not in (None, "sdpa", "magi"):
+            raise ValueError(f"standard runtime does not support attn={attn!r}; use sdpa or magi")
+        if vision_attn not in ("auto", "sdpa", "flash_attention_2"):
+            raise ValueError(f"standard runtime does not support vision_attn={vision_attn!r}")
+
+        model_kwargs = {"torch_dtype": dtype, "trust_remote_code": True}
+        if attn is not None or vision_attn != "auto":
+            config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+            if attn is not None:
+                saved_vision_attn = config.vision_config._attn_implementation
+                config._attn_implementation = attn
+                # Transformers may propagate the root choice to both sub-configs.
+                config.text_config._attn_implementation = attn
+                config.vision_config._attn_implementation = saved_vision_attn
+            if vision_attn != "auto":
+                config.vision_config._attn_implementation = vision_attn
+            model_kwargs["config"] = config
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-        self.model = AutoModel.from_pretrained(
-            model_path,
-            torch_dtype=dtype,
-            trust_remote_code=True,
-        ).to(device).eval()
+        self.model = AutoModel.from_pretrained(model_path, **model_kwargs).to(device).eval()
+        if attn is not None and self.model.config.text_config._attn_implementation != attn:
+            raise RuntimeError(f"requested text attention {attn!r} was not activated")
+        if vision_attn != "auto" and self.model.config.vision_config._attn_implementation != vision_attn:
+            raise RuntimeError(f"requested vision attention {vision_attn!r} was not activated")
 
     def _init_batch_runtime(
         self,
