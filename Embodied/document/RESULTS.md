@@ -1,7 +1,7 @@
 # LocateAnything — Detailed Results
 
 > Full benchmark tables, ablation studies, and qualitative visualizations.
-> For a high-level overview, see the project [README](../README.md).
+> For a high-level overview, see the [LocateAnything README](lam/README.md).
 
 ---
 

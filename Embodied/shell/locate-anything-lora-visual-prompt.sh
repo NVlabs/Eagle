@@ -12,7 +12,7 @@ export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v 'anaconda3' | paste -sd ':' -
 pip install hf_xet
 
 export WANDB_PROJECT="${WANDB_PROJECT:-star-nemo}"
-export WANDB_RUN_ID="${WANDB_RUN_ID:-locany-lora-visual-prompt}"
+export WANDB_RUN_ID="${WANDB_RUN_ID:-lam-lora-visual-prompt}"
 export WANDB_RESUME="${WANDB_RESUME:-allow}"
 if [[ -z "${HF_TOKEN:-}" ]]; then
   echo "Please set HF_TOKEN before launching training." >&2
@@ -22,7 +22,7 @@ export HF_TOKEN
 
 GPUS=${GPUS:-8}
 NNODES=${1:-1}
-OUTPUT_DIR=${2:-"work_dirs/locany_lora_visual_prompt_single_turn"}
+OUTPUT_DIR=${2:-"work_dirs/lam_lora_visual_prompt_single_turn"}
 NODE_RANK=${NODE_RANK:-0}
 PORT=${PORT:-29500}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
@@ -63,7 +63,7 @@ LAUNCHER=pytorch python -m torch.distributed.run \
   --master_addr="$MASTER_ADDR" \
   --nproc_per_node="$GPUS" \
   --master_port="$PORT" \
-  eaglevl/train/locany_finetune_magi_stream.py \
+  eaglevl/train/lam_finetune_magi_stream.py \
   --model_name_or_path "$MODEL_PATH" \
   --max_steps "$MAX_STEPS" \
   --output_dir "$OUTPUT_DIR" \

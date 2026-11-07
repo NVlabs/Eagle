@@ -79,7 +79,7 @@ Key conventions:
 
 ### 2. Data Recipe JSON
 
-Create a recipe file (e.g. `locany_recipe/my_recipe.json`) that maps dataset names to configurations:
+Create a recipe file (e.g. `lam_recipe/my_recipe.json`) that maps dataset names to configurations:
 
 ```json
 {
@@ -114,17 +114,17 @@ Create a recipe file (e.g. `locany_recipe/my_recipe.json`) that maps dataset nam
 
 ```bash
 GPUS=8
-OUTPUT_DIR=work_dirs/locany_sft
+OUTPUT_DIR=work_dirs/lam_sft
 
 torchrun \
     --nnodes=1 \
     --nproc_per_node=$GPUS \
     --master_port=29500 \
-  eaglevl/train/locany_finetune_magi_stream.py \
+  eaglevl/train/lam_finetune_magi_stream.py \
   --model_name_or_path nvidia/LocateAnything-3B \
   --max_steps 25000 \
   --output_dir $OUTPUT_DIR \
-  --meta_path "./locany_recipe/my_recipe.json" \
+  --meta_path "./lam_recipe/my_recipe.json" \
   --overwrite_output_dir False \
   --block_size 6 \
   --attn_implementation magi \
@@ -178,7 +178,7 @@ torchrun \
     --master_addr=$MASTER_ADDR \
     --nproc_per_node=$GPUS \
     --master_port=$MASTER_PORT \
-  eaglevl/train/locany_finetune_magi_stream.py \
+  eaglevl/train/lam_finetune_magi_stream.py \
   --model_name_or_path nvidia/LocateAnything-3B \
   ... # same arguments as single-node
 ```

@@ -1,3 +1,31 @@
+# Copyright 2026 NVIDIA CORPORATION & AFFILIATES
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file is adopted from the Liger-Kernel project
+# (https://github.com/linkedin/Liger-Kernel), licensed under the BSD 2-Clause License.
+#
+# Modifications © 2026 NVIDIA CORPORATION & AFFILIATES, licensed under
+# the Apache License, Version 2.0.
+#
+# --------------------------------------------------------
+# Liger-Kernel
+# Copyright (c) 2024 LinkedIn Corporation
+# Licensed under the BSD 2-Clause License
+# --------------------------------------------------------
+
 """
 copied from liger_kernel/ops/cross_entropy.py
 modified by Guo Chen
@@ -122,8 +150,14 @@ def fused_linear_cross_entropy_forward(
     # we use fp32 for loss accumulator
     loss_1d = torch.zeros(BT, dtype=torch.float32, device=device)
 
-    # loss weight dtype
-    loss_weight = loss_weight.to(_input.dtype) if loss_weight is not None else None
+    # Keep weights in FP32 for the scalar loss so values such as 0.1 are not
+    # quantized to BF16. Cast only the gradient multiplier to the activation
+    # dtype below.
+    loss_weight = (
+        loss_weight.to(device=device, dtype=torch.float32)
+        if loss_weight is not None
+        else None
+    )
 
     # NOTE: skip .item() here to avoid CUDA synchronization
     total_n_non_ignore = (target != ignore_index).sum()
@@ -198,7 +232,8 @@ def fused_linear_cross_entropy_forward(
             loss_1d[start_idx:end_idx] = loss_1d_slice * loss_weight_chunk
             # print("logits_chunk", logits_chunk.shape)
             # print("loss_weight_chunk", loss_weight_chunk.shape)
-            grad_logits_chunk = logits_chunk * loss_weight_chunk.unsqueeze(-1)  # chunk_size x V
+            grad_loss_weight_chunk = loss_weight_chunk.to(logits_chunk.dtype)
+            grad_logits_chunk = logits_chunk * grad_loss_weight_chunk.unsqueeze(-1)  # chunk_size x V
             grad_input[start_idx:end_idx] = grad_logits_chunk @ weight
             # exit()
 
@@ -368,6 +403,11 @@ class LigerFusedLinearCrossEntropyLoss(CrossEntropyLoss):
         super(LigerFusedLinearCrossEntropyLoss, self).__init__(*args, **kwargs)
 
     def forward(self, lin_weight, _input, target, bias=None, loss_weight=None):
+        if loss_weight is not None and self.reduction != "sum":
+            raise ValueError(
+                "Weighted fused linear CE requires reduction='sum'; normalize "
+                "with the intended unscaled denominator in the caller."
+            )
         return LigerFusedLinearCrossEntropyFunction.apply(
             _input,
             lin_weight,

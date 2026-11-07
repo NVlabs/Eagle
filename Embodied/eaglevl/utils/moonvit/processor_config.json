@@ -1,0 +1,15 @@
+{
+  "auto_map": {
+    "AutoImageProcessor": "image_processing_eagle_embodied.EagleEmbodiedImageProcessor",
+    "AutoProcessor": "processing_eagle_embodied.EagleEmbodiedProcessor"
+},
+  "image_end_token": "</img>",
+  "image_placeholder": "image",
+  "image_start_token": "<img>",
+  "image_token": "<IMG_CONTEXT>",
+  "processor_class": "EagleEmbodiedProcessor",
+  "video_placeholder": "video",
+  "video_token": "<IMG_CONTEXT>",
+  "patch_size": 14,
+  "merge_kernel_size": [2, 2]
+}
