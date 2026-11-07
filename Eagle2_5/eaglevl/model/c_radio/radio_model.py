@@ -15,6 +15,7 @@
 from collections import namedtuple
 from typing import Callable, Dict, Iterable, List, NamedTuple, Optional, Tuple, Union
 import copy
+import warnings
 from timm.models import VisionTransformer, create_model
 from timm.models.vision_transformer import Attention
 from einops import rearrange
