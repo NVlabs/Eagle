@@ -1,3 +1,5 @@
+# --------------------------------------------------------
+# NVIDIA
 # Copyright 2026 NVIDIA CORPORATION & AFFILIATES
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +15,7 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+# --------------------------------------------------------
 #
 # Portions of this file are derived from the following projects:
 #   - InternVL (https://github.com/OpenGVLab/InternVL), licensed under the MIT License.
@@ -22,10 +25,6 @@
 # Modifications © 2026 NVIDIA CORPORATION & AFFILIATES, licensed under
 # the Apache License, Version 2.0.
 #
-# --------------------------------------------------------
-# NVIDIA
-# Copyright (c) 2025 NVIDIA
-# Licensed under The MIT License [see LICENSE for details]
 # --------------------------------------------------------
 # InternVL
 # Copyright (c) 2023 OpenGVLab

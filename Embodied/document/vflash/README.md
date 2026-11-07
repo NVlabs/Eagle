@@ -9,7 +9,7 @@
 [![Code License](https://img.shields.io/badge/Code%20License-Apache_2.0-green.svg)](../../../LICENSE)
 [![Model License](https://img.shields.io/badge/Model%20License-NVIDIA%20License-red.svg)](../../LICENSE_MODEL)
 
-[[📘Technical Report](https://research.nvidia.com/labs/lpr/vflash/assets/paper/vflash.pdf)] [[🌐Project Page](https://research.nvidia.com/labs/lpr/vflash/)] [[💻GitHub](https://github.com/NVlabs/Eagle)]
+[[📘Technical Report](https://arxiv.org/abs/2611.08449)] [[🌐Project Page](https://research.nvidia.com/labs/lpr/vflash/)] [[💻GitHub](https://github.com/NVlabs/Eagle)]
 
 <sub>📚 <a href="TRAINING.md">Training</a> &nbsp;·&nbsp; <a href="DATA_PREPARATION.md">Data Preparation</a> &nbsp;·&nbsp; <a href="EVALUATION.md">Evaluation</a> &nbsp;·&nbsp; <a href="RESULTS.md">Detailed Results</a></sub>
 
@@ -28,7 +28,14 @@
 
 ## 🎬 Visual Demo
 
+<!-- Keep the Markdown fallback: GitLab strips the HTML video tag. -->
+<video src="https://github.com/user-attachments/assets/935934d0-78ca-4d0b-8fc9-b1f8e9f970e9" controls playsinline width="100%">
+
 ![VFlash film](../../assets/vflash/full-h264.mp4)
+
+</video>
+
+[Watch the full video on the project website](https://research.nvidia.com/labs/lpr/vflash/assets/media/v27/full-4k-h264.mp4)
 
 
 ## 🧠 Method
@@ -270,11 +277,11 @@ Frozen MolmoMotion-AR target. ADE and FDE in meters (↓); PWT (↑). [Full sett
 ## 📖 Citation
 
 ```bibtex
-@misc{chou2026vflash,
+@article{chou2026vflash,
   title   = {{VFlash}: Fast, Accurate Visual Planning via Flash Primitive Decoding},
   author  = {Chou, Yu-Cheng and Wang, Shihao and Huang, Jin and Huang, Chi-Pin and Yang, Chiao-An and Fan, Xianzhe and Wang, Jing and Li, Zhiqi and Kuang, Yuanguo and Zheng, Ruijie and Bjorck, Johan and Liu, Sifei and Su, Hang and Badki, Abhishek and Zhang, Lei and Yuille, Alan and Fan, Linxi and Kautz, Jan and Yu, Zhiding},
-  year    = {2026},
-  url     = {https://research.nvidia.com/labs/lpr/vflash/}
+  journal = {arXiv:2611.08449},
+  year    = {2026}
 }
 ```
 

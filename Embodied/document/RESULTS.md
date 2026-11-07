@@ -177,11 +177,11 @@
 
 ```bibtex
 @article{wang2025locateanything,
-  title   = {LocateAnything: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
+  title   = {{LocateAnything}: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
   author  = {Shihao Wang and Shilong Liu and Yuanguo Kuang and Xinyu Wei and
              Yangzhou Liu and Zhiqi Li and Yunze Man and Guo Chen and
              Andrew Tao and Guilin Liu and Jan Kautz and Lei Zhang and Zhiding Yu},
-  journal = {arXiv preprint arXiv:25XX.XXXXX},
+  journal = {arXiv:2605.27365},
   year    = {2026},
 }
 ```

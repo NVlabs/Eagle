@@ -9,7 +9,7 @@
 [![Code License](https://img.shields.io/badge/Code%20License-Apache_2.0-green.svg)](LICENSE)
 [![Model License](https://img.shields.io/badge/Model%20License-NVIDIA%20License-red.svg)](./Eagle2_5/LICENSE_MODEL)
 
-[[📘Eagle Report](Eagle/Eagle.pdf)] [[📘Eagle 2 Report](Eagle2_5/Eagle2.pdf)] [[📘Eagle 2.5 Report](Eagle2_5/Eagle2.5.pdf)] [[📘LocateAnything Report](https://research.nvidia.com/labs/lpr/locate-anything/LocateAnything.pdf)] [[📘VFlash Report](https://research.nvidia.com/labs/lpr/vflash/assets/paper/vflash.pdf)]
+[[📘Eagle Report](Eagle/Eagle.pdf)] [[📘Eagle 2 Report](Eagle2_5/Eagle2.pdf)] [[📘Eagle 2.5 Report](Eagle2_5/Eagle2.5.pdf)] [[📘LocateAnything Report](https://research.nvidia.com/labs/lpr/locate-anything/LocateAnything.pdf)] [[📘VFlash Report](https://arxiv.org/abs/2611.08449)]
 
 [[🤗Model Collection](https://huggingface.co/collections/nvidia/eagle)] [[🤗LocateAnything Demo](https://huggingface.co/spaces/nvidia/LocateAnything)] [[🌐Project Page](https://nvlabs.github.io/Eagle/)]
 
@@ -20,8 +20,8 @@
 - [2026/11] 🔥 Release **[VFlash](./Embodied/document/vflash/README.md)**: fast, accurate visual planning via Flash Primitive Decoding.
 - [2026/06] 🎉 LocateAnything is accepted to [ECCV 2026](https://eccv.ecva.net/).
 - [2026/06] 🔥 Release [visual prompt fine-tuning script](./Embodied/shell/locate-anything-lora-visual-prompt.sh) for LocateAnything with LoRA fine-tuning.
-- [2026/06] 🔥 LocateAnything now supports [batch inference](./Embodied/) with a pure FlashAttention runtime — efficient inference on A100, RTX 4090, and other non-Hopper/Blackwell GPUs.
-- [2026/05] 🔥 Release [LocateAnything](./Embodied/) — A generalist vision-language grounding model based on Eagle.
+- [2026/06] 🔥 LocateAnything now supports [batch inference](./Embodied/document/lam/README.md) with a pure FlashAttention runtime — efficient inference on A100, RTX 4090, and other non-Hopper/Blackwell GPUs.
+- [2026/05] 🔥 Release [LocateAnything](./Embodied/document/lam/README.md) — A generalist vision-language grounding model based on Eagle.
 - [2025/12] 🎉 A native resolution variant of the Eagle model is adopted as the VLM backbone of [GR00T-N1.6](https://huggingface.co/collections/nvidia/gr00t-n16). Check out the [tech blog](https://research.nvidia.com/labs/gear/gr00t-n1_6/) for more details.
 - [2025/10] 🔥 Release Eagle 2.5 [source code](https://github.com/NVlabs/EAGLE/tree/main/Eagle2_5).
 - [2025/09] 🔥 Eagle 2.5 is accepted to [NeurIPS 2025](https://neurips.cc/Conferences/2025).
@@ -38,7 +38,7 @@
 
 ### 🌟 Get Started
 - 📚 [Getting started with VFlash](./Embodied/document/vflash/README.md)
-- 📚 [Getting started with LocateAnything](./Embodied/README.md)
+- 📚 [Getting started with LocateAnything](./Embodied/document/lam/README.md)
 - 📚 [Getting started with Eagle 2.5](./Eagle2_5/document/0.onboarding.md)
 - 📚 [README for Eagle](./Eagle/README.md)
 
@@ -52,7 +52,7 @@ Beyond advancing multimodal foundation model research, Eagle has also served as 
 | Model | Features | Summary |
 |:--|:--|:--|
 | **[VFlash](./Embodied/document/vflash/README.md)** | Fast, accurate visual planning | Flash Primitive Decoding for trajectories, boxes, points, and dense motion |
-| **[LocateAnything](./Embodied/)** | Generalist grounding, detection and pointing | Fast & high quality vision-language grounding with Parallel Box Decoding |
+| **[LocateAnything](./Embodied/document/lam/README.md)** | Generalist grounding, detection and pointing | Fast & high quality vision-language grounding with Parallel Box Decoding |
 | **[Eagle 2.5](./Eagle2_5/)** | Frontier VLM with SOTA image & video understanding | Framework & data strategy for long-context multimodal understanding |
 | **[Eagle 2](./Eagle/README.md)** | Frontier VLM with SOTA image understanding | Exploring the post-training data strategies for frontier VLMs |
 | **[Eagle](./Eagle/README.md)** | VLMs with mixture-of-encoders | Exploring the design space for vision-centric VLMs |
@@ -209,17 +209,17 @@ detailed caption: The clip begins with a character with white hair and a beard, 
 ## Citation
 If you find this project useful, please consider citing our works:
 ```bibtex
-@misc{chou2026vflash,
+@article{chou2026vflash,
   title   = {{VFlash}: Fast, Accurate Visual Planning via Flash Primitive Decoding},
   author  = {Chou, Yu-Cheng and Wang, Shihao and Huang, Jin and Huang, Chi-Pin and Yang, Chiao-An and Fan, Xianzhe and Wang, Jing and Li, Zhiqi and Kuang, Yuanguo and Zheng, Ruijie and Bjorck, Johan and Liu, Sifei and Su, Hang and Badki, Abhishek and Zhang, Lei and Yuille, Alan and Fan, Linxi and Kautz, Jan and Yu, Zhiding},
-  year    = {2026},
-  url     = {https://research.nvidia.com/labs/lpr/vflash/}
+  journal = {arXiv:2611.08449},
+  year    = {2026}
 }
 ```
 
 ```latex
 @inproceedings{wang2025locateanything,
-    title={LocateAnything: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
+    title={{LocateAnything}: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
     author={Shihao Wang and Shilong Liu and Yuanguo Kuang and Xinyu Wei and Yangzhou Liu and Zhiqi Li and Yunze Man and Guo Chen and Andrew Tao and Guilin Liu and Jan Kautz and Lei Zhang and Zhiding Yu},
     booktitle={ECCV},
     year={2026}
@@ -228,7 +228,7 @@ If you find this project useful, please consider citing our works:
 
 ```latex
 @inproceedings{man2025locateanything3d,
-    title   = {LocateAnything3D: Vision-Language 3D Detection with Chain-of-Sight},
+    title   = {{LocateAnything3D}: Vision-Language 3D Detection with Chain-of-Sight},
     author  = {Yunze Man and Shihao Wang and Guowen Zhang and Johan Bjorck and Zhiqi Li and Liang-Yan Gui and Jim Fan and Jan Kautz and Yu-Xiong Wang and Zhiding Yu},
     booktitle = {CVPR},
     year    = {2026},

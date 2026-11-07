@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🦅 Eagle Embodied
+# 🦅 Eagle Embodied: Omni System-1 Vision-Language Models for Physical AI
 
 [![Code License](https://img.shields.io/badge/Code%20License-Apache_2.0-green.svg)](../LICENSE)
 [![Model License](https://img.shields.io/badge/Model%20License-NVIDIA%20License-red.svg)](LICENSE_MODEL)
 
-<sub>🎯 <a href="document/lam/README.md">LocateAnything</a> &nbsp;·&nbsp; ⚡ <a href="document/vflash/README.md">VFlash</a> &nbsp;·&nbsp; 📚 <a href="#-documentation">Documentation</a></sub>
+[[🎯LocateAnything](document/lam/README.md)] [[⚡VFlash](document/vflash/README.md)] [[📚Documentation](#-documentation)]
 
 </div>
 
@@ -25,7 +25,7 @@ Fast, accurate visual grounding through **Parallel Box Decoding**. LocateAnythin
 
 Fast, accurate visual planning through **Flash Primitive Decoding**. A lightweight drafter predicts complete visual primitives in parallel, supporting robot and driving trajectories, dense 3D motion, boxes, and points.
 
-[Method and demos](document/vflash/README.md) · [Technical report](https://research.nvidia.com/labs/lpr/vflash/assets/paper/vflash.pdf) · [Project page](https://research.nvidia.com/labs/lpr/vflash/)
+[Method and demos](document/vflash/README.md) · [Technical report](https://arxiv.org/abs/2611.08449) · [Project page](https://research.nvidia.com/labs/lpr/vflash/)
 
 VFlash training and evaluation code is available; target and drafter checkpoints are forthcoming.
 

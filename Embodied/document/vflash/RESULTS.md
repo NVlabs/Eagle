@@ -2,7 +2,7 @@
 
 [VFlash](README.md) · [Training](TRAINING.md) · [Data Preparation](DATA_PREPARATION.md) · [Evaluation](EVALUATION.md) · [Detailed Results](RESULTS.md)
 
-This page summarizes the published experiments from the [technical report](https://research.nvidia.com/labs/lpr/vflash/assets/paper/vflash.pdf), including target–drafter pairs, downstream systems, and latency measurements.
+This page summarizes the published experiments from the [technical report](https://arxiv.org/abs/2611.08449), including target–drafter pairs, downstream systems, and latency measurements.
 
 Each numeric cell reports one value. **Bold** marks the better result within the stated comparison; ↑ means higher is better and ↓ means lower is better.
 

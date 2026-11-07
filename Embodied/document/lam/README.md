@@ -385,7 +385,7 @@ See the [Evaluation Guide](../../evaluation/README.md) for setup and dataset pre
 
 ```bibtex
 @article{wang2025locateanything,
-  title   = {LocateAnything: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
+  title   = {{LocateAnything}: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding},
   author  = {Shihao Wang and Shilong Liu and Yuanguo Kuang and Xinyu Wei and
              Yangzhou Liu and Zhiqi Li and Yunze Man and Guo Chen and
              Andrew Tao and Guilin Liu and Jan Kautz and Lei Zhang and Zhiding Yu},
