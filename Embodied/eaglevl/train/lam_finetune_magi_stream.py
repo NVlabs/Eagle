@@ -43,10 +43,10 @@ from eaglevl.patch import (
     replace_train_dataloader,
     replace_train_sampler
 )
-from eaglevl.model.locany.modeling_locateanything import LocateAnythingForConditionalGeneration
-from eaglevl.model.locany.configuration_locateanything import LocateAnythingConfig
-from eaglevl.utils.locany.processing_locateanything import LocateAnythingProcessor
-from eaglevl.utils.locany.image_processing_locateanything import LocateAnythingImageProcessor
+from eaglevl.model.lam.modeling_locateanything import LocateAnythingForConditionalGeneration
+from eaglevl.model.lam.configuration_locateanything import LocateAnythingConfig
+from eaglevl.utils.lam.processing_locateanything import LocateAnythingProcessor
+from eaglevl.utils.lam.image_processing_locateanything import LocateAnythingImageProcessor
 from eaglevl.sp_utils import set_pg_manager, get_pg_manager
 from eaglevl.train.constants import (
     special_tokens_list, IMG_CONTEXT_TOKEN, TEXT_MASK_TOKEN,
@@ -1570,17 +1570,17 @@ def main():
         if get_rank() == 0:
             output_dir = training_args.output_dir
 
-            locany_utils_src = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), 'utils', 'locany')
+            lam_utils_src = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), 'utils', 'lam')
             skip_files = {'config.json', 'README.md', '__init__.py', '__pycache__'}
-            if osp.isdir(locany_utils_src):
-                for file in os.listdir(locany_utils_src):
+            if osp.isdir(lam_utils_src):
+                for file in os.listdir(lam_utils_src):
                     if file in skip_files or file.startswith('__'):
                         continue
-                    src_file = osp.join(locany_utils_src, file)
+                    src_file = osp.join(lam_utils_src, file)
                     dst_file = osp.join(output_dir, file)
                     if osp.isfile(src_file):
                         shutil.copy2(src_file, dst_file)
-                logger.info(f"Copied inference files from {locany_utils_src} to {output_dir}")
+                logger.info(f"Copied inference files from {lam_utils_src} to {output_dir}")
 
             config_path = osp.join(output_dir, 'config.json')
             if osp.exists(config_path):

@@ -70,6 +70,22 @@ class ModelArguments:
         default=False,
         metadata={'help': 'Set to True to use gradient checkpointing.'},
     )
+    gradient_checkpointing_use_reentrant: bool = field(
+        default=False,
+        metadata={'help': 'Use reentrant autograd checkpointing. Non-reentrant is recommended for long contexts.'},
+    )
+    rope_scaling_type: Optional[str] = field(
+        default='auto',
+        metadata={'help': 'RoPE scaling for long context: auto, yarn, dynamic, linear, or none.'},
+    )
+    rope_scaling_factor: Optional[float] = field(
+        default=None,
+        metadata={'help': 'Optional RoPE scaling factor. By default it is derived from max_seq_length.'},
+    )
+    rope_original_max_position_embeddings: Optional[int] = field(
+        default=None,
+        metadata={'help': 'Original pretrained context length used to derive RoPE scaling.'},
+    )
     save_every_n_hours: int = field(
         default=4,
     )
@@ -116,6 +132,35 @@ class ModelArguments:
         default=3,
         metadata={'help': 'expected mask repeat time.'},
     )
+    # VFlash options. They apply only when training_mode is set; the defaults
+    # are those of the reference runs.
+    training_mode: Optional[str] = field(
+        default=None,
+        metadata={
+            'help': (
+                'VFlash objective. Unset trains Eagle Embodied as usual; "ar" trains '
+                'the VFlash target with physical-atom tokens; "vflash" freezes that '
+                'target and trains a separate VFlash drafter.'
+            )
+        },
+    )
+    oof_loss_scale: float = field(
+        default=0.1,
+        metadata={'help': 'Loss weight of every <oof> target relative to other tokens.'},
+    )
+    vflash_anchors_per_sequence: int = field(
+        default=512,
+        metadata={'help': 'Random ordinary-text response anchors sampled per clean sequence.'},
+    )
+    vflash_loss_gamma: float = field(
+        default=7.0,
+        metadata={
+            'help': (
+                'Position-weight decay gamma of ordinary-text B16 blocks. '
+                'Physical-atom blocks are always uniform.'
+            )
+        },
+    )
 
 
 @dataclass
@@ -132,9 +177,30 @@ class DataTrainingArguments:
             )
         },
     )
+    conv_style: Optional[str] = field(
+        default='qwen2-chat', metadata={'help': 'Prompt style for a conversation.'}
+    )
     meta_path: Optional[str] = field(
         default=None,
         metadata={'help': 'The path of the meta file of datasets.'},
+    )
+    jsonl_index_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            'help': (
+                'Shared working directory for per-launch JSONL byte-offset indexes. '
+                'Training rebuilds every index on each launch. '
+                'Defaults to .jsonl_index next to meta_path.'
+            )
+        },
+    )
+    jsonl_index_workers: int = field(
+        default=4,
+        metadata={'help': 'Concurrent index builders per distributed rank.'},
+    )
+    jsonl_index_chunk_size_mb: int = field(
+        default=4,
+        metadata={'help': 'Chunk size in MiB used while scanning JSONL files.'},
     )
     neftune_alpha: Optional[float] = field(
         default=None,
@@ -188,9 +254,58 @@ class DataTrainingArguments:
         default=32,
         metadata={'help': 'The buffer size for the packing. Default is 32.'}
     )
+    balance_media_tokens: bool = field(
+        default=False,
+        metadata={'help': 'Align media-cost quantiles across data-parallel ranks with bounded lookahead.'}
+    )
+    balance_window_size: int = field(
+        default=8,
+        metadata={'help': 'Number of completed packs in one media-balance lookahead window.'}
+    )
+    balance_seed: Optional[int] = field(
+        default=None,
+        metadata={'help': 'Shared media-balance seed. Defaults to the training seed on every rank.'}
+    )
+    debug_assert_sp_batch_sync: bool = field(
+        default=False,
+        metadata={'help': 'Hash and compare initial packed batches inside each sequence-parallel group.'}
+    )
     sample_log_interval: int = field(
         default=100,
         metadata={'help': 'Log image count every N steps. Default is 100.'}
+    )
+    strict_data: bool = field(
+        default=False,
+        metadata={
+            'help': (
+                'Abort on any data error instead of skipping the sample, so the trained '
+                'stream never silently diverges. A transient error such as a video '
+                'read timeout then ends the job; resume it from the last checkpoint.'
+            )
+        },
+    )
+    packing_log_interval: int = field(
+        default=10000,
+        metadata={'help': 'Log packing occupancy every N packs on the first data worker.'}
+    )
+    vflash_max_samples_per_pack: int = field(
+        default=8,
+        metadata={
+            'help': (
+                'A VFlash pack closes once it holds this many clean samples. With '
+                '--vflash_train_sample_epochs, max_num_tokens must fit that many '
+                'samples of max_num_tokens_per_sample.'
+            )
+        },
+    )
+    vflash_train_sample_epochs: Optional[float] = field(
+        default=None,
+        metadata={
+            'help': (
+                'Set max_steps from this many raw-sample epochs of the recipe '
+                '(--training_mode vflash only).'
+            )
+        },
     )
     auto_thinking_handler: bool = field(
         default=False,

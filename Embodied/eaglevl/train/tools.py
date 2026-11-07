@@ -1,3 +1,25 @@
+# Copyright 2026 NVIDIA CORPORATION & AFFILIATES
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file is adopted from the LlamaFactory project
+# (https://github.com/hiyouga/LLaMA-Factory), licensed under the Apache License 2.0.
+#
+# Modifications © 2026 NVIDIA CORPORATION & AFFILIATES, licensed under
+# the Apache License, Version 2.0.
+#
 # Copyright 2024 the LlamaFactory team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,17 +69,18 @@ _DETECTION_CATEGORY_RE = re.compile(
 _BOX_RE = re.compile(r"<box><(\d+)><(\d+)><(\d+)><(\d+)></box>")
 
 def get_last_checkpoint_guard(folder):
-    while True:
-        last_checkpoint = get_last_checkpoint(folder)
-        if last_checkpoint is None:
-            break
-        
+    last_checkpoint = get_last_checkpoint(folder)
+    if last_checkpoint is not None:
         world_size = dist.get_world_size()
-        if len(glob.glob(os.path.join(last_checkpoint, "*.pth"))) != world_size:
-            # incomplete xxx.pth
-            shutil.rmtree(last_checkpoint)
-        else:
-            break
+        num_states = len(glob.glob(os.path.join(last_checkpoint, "*.pth")))
+        # One *.pth state per rank: a different count means an interrupted
+        # save or a different GPU count. Stop instead of deleting checkpoints.
+        if num_states != world_size:
+            raise RuntimeError(
+                f"{last_checkpoint} has {num_states} per-rank *.pth states, but this run has "
+                f"{world_size} processes. Resume with the GPU count that saved it, or move the "
+                "checkpoint out of the output directory if its save was interrupted."
+            )
 
     return last_checkpoint
 
@@ -255,73 +278,145 @@ def load_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+
+def build_local_processor(model_path, tokenizer):
+    """Build the repository ``EagleEmbodiedProcessor`` from checkpoint assets.
+
+    ``AutoProcessor(..., trust_remote_code=True)`` would run the processor code
+    bundled with the checkpoint, which may predate this repository (older
+    bundles cannot decode ``{video, frame_index}`` image references). Here no
+    checkpoint code runs: ``processor_config.json`` and
+    ``preprocessor_config.json`` come from ``model_path`` (a local directory or
+    a Hub id) or, when absent there, from ``eaglevl/utils/moonvit``. The chat
+    template comes from the checkpoint's ``chat_template.json`` or
+    ``chat_template.jinja``, then the repository ``chat_template.json``, then
+    the tokenizer.
+    """
+    from transformers.utils.hub import cached_file
+
+    from eaglevl.utils.moonvit.image_processing_eagle_embodied import EagleEmbodiedImageProcessor
+    from eaglevl.utils.moonvit.processing_eagle_embodied import EagleEmbodiedProcessor
+
+    repository_asset_dir = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), "utils", "moonvit")
+
+    def checkpoint_asset(filename):
+        try:
+            return cached_file(model_path, filename)
+        except (EnvironmentError, OSError):
+            return None
+
+    def resolve_asset(filename):
+        resolved = checkpoint_asset(filename)
+        if resolved is not None:
+            return resolved
+        fallback = osp.join(repository_asset_dir, filename)
+        if not osp.isfile(fallback):
+            raise FileNotFoundError(
+                f"Processor asset {filename!r} is missing from both "
+                f"{model_path} and {repository_asset_dir}"
+            )
+        return fallback
+
+    processor_config = load_config(resolve_asset("processor_config.json"))
+    preprocessor_config = load_config(resolve_asset("preprocessor_config.json"))
+    for key in ("auto_map", "processor_class"):
+        processor_config.pop(key, None)
+    for key in ("auto_map", "image_processor_type", "processor_class"):
+        preprocessor_config.pop(key, None)
+
+    chat_template = getattr(tokenizer, "chat_template", None)
+    template_json = checkpoint_asset("chat_template.json")
+    template_jinja = None if template_json is not None else checkpoint_asset("chat_template.jinja")
+    if template_json is None and template_jinja is None:
+        repository_template = osp.join(repository_asset_dir, "chat_template.json")
+        if osp.isfile(repository_template):
+            template_json = repository_template
+    if template_json is not None:
+        chat_template = load_config(template_json).get("chat_template", chat_template)
+    elif template_jinja is not None:
+        with open(template_jinja, "r", encoding="utf-8") as f:
+            chat_template = f.read()
+    if chat_template is not None:
+        processor_config["chat_template"] = chat_template
+
+    image_processor = EagleEmbodiedImageProcessor(**preprocessor_config)
+    return EagleEmbodiedProcessor(
+        image_processor=image_processor,
+        tokenizer=tokenizer,
+        **processor_config,
+    )
+
+
+_THINKING_SUFFIX_PATTERN = re.compile(
+    r"(?:\s*/(?:no_?think|think))+\s*$",
+    flags=re.IGNORECASE,
+)
+_THINK_BLOCK_PATTERN = re.compile(
+    r"<think>(.*?)</think>",
+    flags=re.DOTALL | re.IGNORECASE,
+)
+_EMPTY_THINK_PATTERN = re.compile(
+    r"<think>\s*</think>\s*",
+    flags=re.DOTALL | re.IGNORECASE,
+)
+
+
+def _get_human_gpt_pairs(conversations):
+    """Return validated one-to-one human/GPT turn pairs."""
+    pairs = []
+    pending_human_idx = None
+
+    for idx, message in enumerate(conversations):
+        role = message.get("from")
+        if role == "human":
+            if pending_human_idx is not None:
+                raise ValueError(
+                    "Human message at index "
+                    f"{pending_human_idx} has no matching GPT response"
+                )
+            pending_human_idx = idx
+        elif role == "gpt":
+            if pending_human_idx is None:
+                raise ValueError(
+                    f"GPT message at index {idx} has no matching human prompt"
+                )
+            pairs.append((pending_human_idx, idx))
+            pending_human_idx = None
+
+    if pending_human_idx is not None:
+        raise ValueError(
+            f"Human message at index {pending_human_idx} has no matching GPT response"
+        )
+    return pairs
+
+
+def _replace_thinking_suffix(prompt, suffix=None):
+    prompt = _THINKING_SUFFIX_PATTERN.sub("", prompt).rstrip()
+    return f"{prompt} {suffix}" if suffix is not None else prompt
+
+
 def auto_thinking_prompt_handler(conversations):
     """
     Automatically process conversation data to conform to thinking mode format.
-    - For GPT replies with thinking content, append /think marker after the human question.
-    - For empty thinking blocks, remove them from the answer without adding /no_think marker.
+    - For GPT replies without thinking content, prepend an empty <think>\\n\\n</think>\\n\\n block and append /no_think after the human question.
+    - For GPT replies with thinking content, append /think after the human question.
     """
-    empty_thinking_block = '<think>\n\n</think>\n\n'
-    
-    def find_next_human(conversations, start_idx):
-        for i in range(start_idx, len(conversations)):
-            if conversations[i]['from'] == 'human':
-                return i
-        return len(conversations)
-    
-    def get_next_all_gpt_thinking_status(conversations, start_idx):
-        """
-        Check the thinking status of all GPT messages from start_idx until the next human message.
-        Returns: (is_thinking_mode, has_empty_thinking, gpt_idx_list)
-        - is_thinking_mode: Whether the last GPT message is in thinking mode (has non-empty thinking content)
-        - has_empty_thinking: Whether there are empty thinking blocks
-        - gpt_idx_list: List of indices of all GPT messages
-        """
-        is_thinking_mode = False
-        has_empty_thinking = False
-        gpt_idx_list = []
-        for i in range(start_idx, len(conversations)):
-            if conversations[i]['from'] == 'human':
-                break
-            
-            if conversations[i]['from'] == 'gpt':
-                value = conversations[i]['value']
-                # Check if it contains an empty thinking block
-                if empty_thinking_block in value:
-                    has_empty_thinking = True
-                
-                # Check for non-empty thinking content (remove empty blocks first)
-                value_to_check = value.replace(empty_thinking_block, '')
-                if '<think>' in value_to_check and '</think>' in value_to_check:
-                    # Extract all thinking block contents and check if any are non-empty
-                    thinking_pattern = r'<think>(.*?)</think>'
-                    matches = re.findall(thinking_pattern, value_to_check, re.DOTALL)
-                    if matches and any(match.strip() for match in matches):
-                        is_thinking_mode = True
-                
-                gpt_idx_list.append(i)
-        return is_thinking_mode, has_empty_thinking, gpt_idx_list
-    
-    i = 0
-    while i < len(conversations):
-        human_idx = find_next_human(conversations, i)
-        if human_idx == len(conversations):
-            break
-        is_thinking_mode, has_empty_thinking, gpt_idx_list = get_next_all_gpt_thinking_status(conversations, human_idx + 1)
-        
-        if len(gpt_idx_list) > 0:
-            # If there are empty thinking blocks, remove them
-            if has_empty_thinking:
-                for gpt_idx in gpt_idx_list:
-                    if empty_thinking_block in conversations[gpt_idx]['value']:
-                        conversations[gpt_idx]['value'] = conversations[gpt_idx]['value'].replace(empty_thinking_block, '')
-            
-            # If in thinking mode, append /think marker
-            if is_thinking_mode:
-                if '/think' not in conversations[human_idx]['value'] and '/no_think' not in conversations[human_idx]['value']:
-                    conversations[human_idx]['value'] = conversations[human_idx]['value'] + ' /think'
-            # If thinking blocks were empty (already removed), do not add any marker
-        i = human_idx + 1
+    empty_think_prefix = "<think>\n\n</think>\n\n"
+    for human_idx, gpt_idx in _get_human_gpt_pairs(conversations):
+        response = conversations[gpt_idx]["value"]
+        is_thinking_mode = any(
+            match.group(1).strip()
+            for match in _THINK_BLOCK_PATTERN.finditer(response)
+        )
+        suffix = "/think" if is_thinking_mode else "/no_think"
+        conversations[human_idx]["value"] = _replace_thinking_suffix(
+            conversations[human_idx]["value"],
+            suffix,
+        )
+        response = _EMPTY_THINK_PATTERN.sub("", response)
+        if not is_thinking_mode:
+            response = empty_think_prefix + response
+        conversations[gpt_idx]["value"] = response
     return conversations
 
 
@@ -510,8 +605,20 @@ def process_multimodal_sample(
             elif isinstance(img, Image.Image):
                 image_data.append(img.convert("RGB"))
             elif isinstance(img, dict):
-                if 'video' in img:  # Support the case where video frames are treated as images
+                if 'video' in img and 'frame_index' in img:
+                    # One frame of a video is the still-image observation. Keep
+                    # both fields so the processor decodes that frame instead of
+                    # sampling the whole video.
+                    img_copy = img.copy()
+                    img_copy['video'] = osp.join(media_root, img_copy['video'])
+                    image_data.append(img_copy)
+                elif 'video' in img:  # Support the case where video frames are treated as images
                     video_data.append(osp.join(media_root, img['video']))
+                elif 'file' in img:
+                    # Plain image file with per-image options such as resize.
+                    img_copy = img.copy()
+                    img_copy['file'] = osp.join(media_root, img_copy['file'])
+                    image_data.append(img_copy)
                 else:  # Handle lmdb-format images
                     img_copy = img.copy()
                     if 'lmdb_file' in img_copy:
@@ -523,7 +630,12 @@ def process_multimodal_sample(
         video_list = raw_videos if isinstance(raw_videos, list) else [raw_videos]
         for vid in video_list:
             if isinstance(vid, str):
-                video_data.append(dict(video=osp.join(media_root, vid)))
+                vid_entry = dict(video=osp.join(media_root, vid))
+                if sample.get("clip_start_frame") is not None:
+                    vid_entry["clip_start_frame"] = sample["clip_start_frame"]
+                if sample.get("clip_end_frame") is not None:
+                    vid_entry["clip_end_frame"] = sample["clip_end_frame"]
+                video_data.append(vid_entry)
 
     # If there is no media and no conversation, return empty
     if not conversations and not image_data and not video_data:
@@ -599,12 +711,24 @@ def process_multimodal_sample(
                 if media_type == 'image':
                     content_list.append({"type": "image", "image": path_info})
                 elif media_type == 'video':
-                    video_path = path_info['video'] if isinstance(path_info, dict) else path_info
-                    content_list.append({
-                        "type": "video", "video": video_path,
-                        'max_frames': max_frames, "fps": target_fps,
-                        "video_total_pixels": video_total_pixels
-                    })
+                    if isinstance(path_info, dict):
+                        video_path = path_info['video']
+                        video_entry = {
+                            "type": "video", "video": video_path,
+                            'max_frames': max_frames, "fps": target_fps,
+                            "video_total_pixels": video_total_pixels
+                        }
+                        if "clip_start_frame" in path_info:
+                            video_entry["clip_start_frame"] = path_info["clip_start_frame"]
+                        if "clip_end_frame" in path_info:
+                            video_entry["clip_end_frame"] = path_info["clip_end_frame"]
+                        content_list.append(video_entry)
+                    else:
+                        content_list.append({
+                            "type": "video", "video": path_info,
+                            'max_frames': max_frames, "fps": target_fps,
+                            "video_total_pixels": video_total_pixels
+                        })
             except (IndexError, KeyError):
                 # Ignore the placeholder if index or type does not exist
                 pass

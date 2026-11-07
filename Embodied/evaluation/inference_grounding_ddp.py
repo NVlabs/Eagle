@@ -99,7 +99,7 @@ def get_args():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="./work_dirs/locany_baseline",
+        default="./work_dirs/lam_baseline",
     )
     parser.add_argument(
         "--test_jsonl_path",

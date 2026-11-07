@@ -19,7 +19,39 @@ dependencies = ["transformers==4.57.1", "tokenizers==0.22.0", "sentencepiece==0.
     "gradio==3.35.2", "gradio_client==0.2.9", "lmdb",
     "requests", "httpx==0.24.0", "uvicorn", "fastapi", "streamlit", "streamlit-image-select", 
     "einops", "einops-exts", "timm>=1.0.11", "deepspeed==0.15.4", "av", "liger_kernel==0.3.1", "filetype", "bitstring",
-    "ebmlite", "triton>=3.1.0", "scipy>=1.10.0", "datasets>=2.21.0",  "dotenv", "decord", "scikit-image", "imagehash", "opencv-python-headless"
+    "ebmlite", "triton>=3.1.0", "scipy>=1.10.0", "datasets>=2.21.0",  "dotenv", "decord", "scikit-image", "imagehash", "opencv-python-headless",
+    "sortedcontainers"
+]
+
+[project.optional-dependencies]
+training = [
+    "torch>=2.4",
+    "torchvision",
+    "flash-attn",
+    "tensorboard",
+]
+locate = [
+    "torch>=2.4",
+    "torchvision",
+    "flash-attn",
+    "magi-attention",
+    "tensorboard",
+]
+# VFlash target and drafter training. The drafter trains with compiled
+# FlexAttention, validated with PyTorch 2.8 (including NGC 2.8.0a0 builds) and
+# Triton 3.3.
+vflash = [
+    "torch>=2.8.0a0,<2.9",
+    "torchvision>=0.23.0a0,<0.24",
+    "triton>=3.3,<3.4",
+    "flash-attn",
+    "tensorboard",
+]
+evaluation = [
+    "torch>=2.4",
+    "torchvision",
+    "pycocotools",
+    "shapely",
 ]
 
 [project.urls]
@@ -27,7 +59,7 @@ dependencies = ["transformers==4.57.1", "tokenizers==0.22.0", "sentencepiece==0.
 "Bug Tracker" = "https://github.com/NVlabs/EAGLE/issues"
 
 [tool.setuptools.packages.find]
-include = ["eaglevl"]
+include = ["eaglevl", "evaluation*"]
 exclude = ["tools", "data*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "shell*", "work_dirs*", "pretrained*", "vid_playground*", "wandb*", "vlmeval*", "internel*", "streamlit*"]
 
 [tool.wheel]

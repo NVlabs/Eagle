@@ -18,7 +18,7 @@ export HF_TOKEN="${HF_TOKEN:?Please set HF_TOKEN environment variable}"
 
 GPUS=${GPUS:-8}
 NNODES=${1:-1}
-OUTPUT_DIR=${2:-"work_dirs/locany_debug"}
+OUTPUT_DIR=${2:-"work_dirs/lam_debug"}
 NODE_RANK=${NODE_RANK:-0}
 PORT=${PORT:-29500}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
@@ -42,7 +42,7 @@ LAUNCHER=pytorch torchrun \
     --master_addr=$MASTER_ADDR \
     --nproc_per_node=$GPUS \
     --master_port=$PORT \
-  eaglevl/train/locany_finetune_magi_stream.py \
+  eaglevl/train/lam_finetune_magi_stream.py \
   --model_name_or_path ${MODEL_PATH} \
   --max_steps 8000 \
   --output_dir ${OUTPUT_DIR} \

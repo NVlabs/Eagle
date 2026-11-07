@@ -1,3 +1,25 @@
+# Copyright 2026 NVIDIA CORPORATION & AFFILIATES
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file is adopted from the XTuner project
+# (https://github.com/InternLM/xtuner), licensed under the Apache License 2.0.
+#
+# Modifications © 2026 NVIDIA CORPORATION & AFFILIATES, licensed under
+# the Apache License, Version 2.0.
+#
 # Copyright (c) OpenMMLab. All rights reserved.
 import math
 
@@ -8,6 +30,22 @@ from .comm import (all_to_all, gather_forward_split_backward,
 from .globals import get_pg_manager
 
 
+def repeat_kv_for_ulysses(states, query_heads):
+    """Expand grouped-query KV heads to query-head order before all-to-all."""
+    batch, sequence, kv_heads, head_dim = states.shape
+    if query_heads % kv_heads != 0:
+        raise ValueError(
+            f'Query heads ({query_heads}) must be a multiple of KV heads ({kv_heads}).'
+        )
+    repeats = query_heads // kv_heads
+    return (
+        states[:, :, :, None, :]
+        .expand(batch, sequence, kv_heads, repeats, head_dim)
+        .reshape(batch, sequence, query_heads, head_dim)
+        .contiguous()
+    )
+
+
 def pre_process_for_sequence_parallel_attn(query_states,
                                            key_states,
                                            value_states,
@@ -15,6 +53,28 @@ def pre_process_for_sequence_parallel_attn(query_states,
                                            gather_dim=1):
     b, s_div_sp, h, d = query_states.shape
     sp = get_pg_manager().ulysses_sequence_parallel_world_size
+
+    if h % sp != 0:
+        raise ValueError(
+            f'Query heads ({h}) must be divisible by the Ulysses size ({sp}).'
+        )
+
+    # Ulysses scatters the head dimension. GQA/MQA checkpoints often have
+    # fewer KV heads than SP ranks (for example Qwen3 2B has 16 Q heads but
+    # only 8 KV heads). Expand KV heads to the query-head count before the
+    # all-to-all so every rank receives an equal, valid KV shard. This keeps
+    # the per-rank KV activation size bounded because the sequence dimension
+    # was already divided by SP.
+    kv_heads = key_states.shape[2]
+    if value_states.shape[2] != kv_heads:
+        raise ValueError('Key and value tensors must have the same number of heads.')
+    if kv_heads != h:
+        if h % kv_heads != 0:
+            raise ValueError(
+                f'Query heads ({h}) must be a multiple of KV heads ({kv_heads}) for GQA expansion.'
+            )
+        key_states = repeat_kv_for_ulysses(key_states, h)
+        value_states = repeat_kv_for_ulysses(value_states, h)
 
     # if not is_inner_sequence_parallel_initialized():
     #     insp = sp // math.gcd(h, sp)

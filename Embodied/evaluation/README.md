@@ -1,6 +1,7 @@
 # LocateAnything Evaluation Guide
 
 This guide shows how to download evaluation data, unpack images, and run LocateAnything evaluations across datasets and task types.
+For VFlash benchmark commands and decoding settings, use the [VFlash Evaluation Guide](../document/vflash/EVALUATION.md).
 
 ### 1 Install FastEvaluate (required for COCO/LVIS metrics)
 

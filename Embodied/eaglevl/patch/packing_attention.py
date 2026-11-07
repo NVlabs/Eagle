@@ -1,3 +1,31 @@
+# Copyright 2026 NVIDIA CORPORATION & AFFILIATES
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This file is adopted from the Hugging Face Transformers project
+# (https://github.com/huggingface/transformers), licensed under the Apache License, Version 2.0.
+#
+# Modifications © 2026 NVIDIA CORPORATION & AFFILIATES, licensed under
+# the Apache License, Version 2.0.
+#
+# --------------------------------------------------------
+# Hugging Face Transformers
+# Copyright 2024 The Fairseq Authors and the HuggingFace Inc. team. All rights reserved.
+# Licensed under the Apache License, Version 2.0
+# --------------------------------------------------------
+
 import inspect
 import os
 from typing import Optional, Tuple
@@ -35,7 +63,6 @@ except:
 
 
 if is_flash_attn_2_available():
-    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
     from flash_attn import flash_attn_func, flash_attn_varlen_func
 
     _flash_supports_window_size = "window_size" in list(inspect.signature(flash_attn_func).parameters)
@@ -106,25 +133,41 @@ def _flash_attention_forward(
         dist.is_initialized() and get_pg_manager() is not None and get_pg_manager().sequence_parallel_world_size > 1
     )
 
+    if target_dtype is not None:
+        query_states = query_states.to(target_dtype)
+        key_states = key_states.to(target_dtype)
+        value_states = value_states.to(target_dtype)
+
     if enable_sequence_parallel:
         query_states, key_states, value_states = pre_process_for_sequence_parallel_attn(query_states, key_states, value_states)
         query_length = query_states.shape[1]
 
-    sub_sample_lengths = []
-    # Get all unique IDs and sort them (including 0)
-    for i in range(attention_mask.shape[0]):
+    if attention_mask is None or attention_mask.ndim != 2:
+        raise ValueError('Packed FlashAttention requires a 2D integer data-index mask.')
+    if attention_mask.shape[-1] != query_length:
+        raise ValueError(
+            f'Packing mask length ({attention_mask.shape[-1]}) does not match the '
+            f'post-all-to-all query length ({query_length}).'
+        )
+    if os.environ.get('EAGLE_VALIDATE_PACKING_MASK', '0') == '1':
+        for row in attention_mask:
+            if int(row[0].item()) != 0:
+                raise ValueError('Packing mask IDs must start at zero.')
+            differences = row[1:] - row[:-1]
+            if not torch.all((differences == 0) | (differences == 1)):
+                raise ValueError('Packing mask IDs must form contiguous, monotonically increasing segments.')
 
-        unique_ids = attention_mask[i].unique(sorted=True)
-        # Count the number of occurrences for each ID
-        lengths = [(attention_mask[i] == uid).sum().item() for uid in unique_ids]
-        length_dict = {int(uid): length for uid, length in zip(unique_ids, lengths)}
-        length_list = [length_dict[i] if i in length_dict else 0 for i in range(0, max(length_dict)+1)]
-        # length_list.append(length_dict[0])
-        sub_sample_lengths.append(torch.tensor(length_list, device=attention_mask.device, dtype=torch.int32))
+    # Segment IDs are contiguous and start at zero. ``bincount`` derives every
+    # packed length in one device operation; the previous per-segment ``item``
+    # loop introduced thousands of CPU/GPU synchronizations at 256K context.
+    sub_sample_lengths = [
+        torch.bincount(row.to(torch.long)).to(dtype=torch.int32)
+        for row in attention_mask
+    ]
 
     if attention_mask is not None:
         batch_size = query_states.shape[0]
-        query_states, key_states, value_states, indices_q, cu_seq_lens, max_seq_lens = _unpad_input_packing(
+        query_states, key_states, value_states, _indices_q, cu_seq_lens, max_seq_lens = _unpad_input_packing(
             query_states, key_states, value_states, attention_mask, query_length, sub_sample_lengths
         )
         cu_seqlens_q, cu_seqlens_k = cu_seq_lens
@@ -146,7 +189,15 @@ def _flash_attention_forward(
             **flash_kwargs,
             )
 
-        attn_output = pad_input(attn_output_unpad, indices_q, batch_size, query_length)
+        # Packing keeps every token (including the independent dummy segment),
+        # so indices_q is the identity and a reshape avoids another 256K-sized
+        # gather/copy.
+        attn_output = attn_output_unpad.reshape(
+            batch_size,
+            query_length,
+            attn_output_unpad.shape[-2],
+            attn_output_unpad.shape[-1],
+        )
         if enable_sequence_parallel:
             attn_output = post_process_for_sequence_parallel_attn(attn_output)
         return attn_output
@@ -157,10 +208,10 @@ def _get_unpad_data_packing(attention_mask, sub_sample_lengths):
     """
     In this function, we didn't skip padding tokens.
     """
-    seqlens_in_batch = []
-    for i, per_sub_sample_lengths in enumerate(sub_sample_lengths):
-        seqlens_in_batch.extend(per_sub_sample_lengths)
-    seqlens_in_batch = torch.tensor(seqlens_in_batch, device=attention_mask.device, dtype=torch.int32)
+    seqlens_in_batch = torch.cat(
+        [lengths.reshape(-1) for lengths in sub_sample_lengths],
+        dim=0,
+    ).to(device=attention_mask.device, dtype=torch.int32)
 
     indices = torch.arange(attention_mask.flatten().shape[0], device=attention_mask.device, dtype=torch.int64)
     max_seqlen_in_batch = seqlens_in_batch.max().item()
@@ -178,13 +229,11 @@ def _unpad_input_packing(query_layer, key_layer, value_layer, attention_mask, qu
         attention_mask_num_tokens = attention_mask.shape[-1]
         attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len :]
     indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data_packing(attention_mask, sub_sample_lengths)
-    key_layer = index_first_axis(key_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim), indices_k)
-    value_layer = index_first_axis(value_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim), indices_k)
+    key_layer = key_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim)
+    value_layer = value_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim)
 
     if query_length == kv_seq_len:
-        query_layer = index_first_axis(
-            query_layer.reshape(batch_size * kv_seq_len, num_heads_q, head_dim), indices_k
-        )
+        query_layer = query_layer.reshape(batch_size * kv_seq_len, num_heads_q, head_dim)
         cu_seqlens_q = cu_seqlens_k
         max_seqlen_in_batch_q = max_seqlen_in_batch_k
         indices_q = indices_k

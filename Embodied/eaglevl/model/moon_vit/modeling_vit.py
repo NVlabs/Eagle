@@ -486,6 +486,7 @@ class MoonVitEncoder(nn.Module):
         hidden_dim: int,
         num_layers: int,
         block_cfg: dict,
+        use_final_layernorm: bool = True,
     ) -> None:
         super().__init__()
 
@@ -495,7 +496,8 @@ class MoonVitEncoder(nn.Module):
         self.blocks = nn.ModuleList(
             [MoonVitEncoderLayer(**block_cfg) for _ in range(num_layers)]
         )
-        self.final_layernorm = nn.LayerNorm(hidden_dim)
+        # Eagle Embodied checkpoints have no final layernorm and set this to False.
+        self.final_layernorm = nn.LayerNorm(hidden_dim) if use_final_layernorm else None
         self.gradient_checkpointing = True
 
     def forward(
@@ -525,7 +527,8 @@ class MoonVitEncoder(nn.Module):
                     hidden_states, cu_seqlens, rope_freqs_cis=rope_freqs_cis
                 )
 
-        hidden_states = self.final_layernorm(hidden_states)
+        if self.final_layernorm is not None:
+            hidden_states = self.final_layernorm(hidden_states)
 
         return hidden_states
 
@@ -567,7 +570,7 @@ class MoonVitPretrainedModel(PreTrainedModel):
     _supports_sdpa = True
     supports_gradient_checkpointing = True
 
-    def __init__(self, config: MoonViTConfig, *inputs, **kwargs):
+    def __init__(self, config: MoonViTConfig, *inputs, use_final_layernorm: bool = True, **kwargs):
         super().__init__(config, *inputs, **kwargs)
         config = deepcopy(config)
         self.merge_kernel_size = config.merge_kernel_size
@@ -590,6 +593,7 @@ class MoonVitPretrainedModel(PreTrainedModel):
                 "attn_bias": True,
                 "attn_implementation": config._attn_implementation,
             },
+            use_final_layernorm=use_final_layernorm,
         )
 
     def forward(

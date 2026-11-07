@@ -1,0 +1,9 @@
+{
+    "auto_map": {
+      "AutoImageProcessor": "image_processing_eagle_embodied.EagleEmbodiedImageProcessor",
+      "AutoProcessor": "processing_eagle_embodied.EagleEmbodiedProcessor"
+    },
+    "image_processor_type": "EagleEmbodiedImageProcessor",
+    "merge_kernel_size": [2, 2],
+    "in_token_limit": 25600
+  }

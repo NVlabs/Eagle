@@ -246,7 +246,7 @@ A complete training setup might look like:
 
 ```
 project/
-├── locany_recipe/
+├── lam_recipe/
 │   └── my_recipe.json                  ← recipe file (--meta_path)
 ├── data/
 │   ├── annotations/
@@ -301,9 +301,9 @@ Then launch training:
 
 ```bash
 torchrun --nproc_per_node=8 \
-  eaglevl/train/locany_finetune_magi_stream.py \
+  eaglevl/train/lam_finetune_magi_stream.py \
   --model_name_or_path nvidia/LocateAnything-3B \
-  --meta_path "./locany_recipe/my_recipe.json" \
+  --meta_path "./lam_recipe/my_recipe.json" \
   --output_dir work_dirs/my_sft \
   --max_steps 25000 \
   --learning_rate 2e-5 \

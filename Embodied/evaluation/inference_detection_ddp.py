@@ -23,9 +23,11 @@ from torch.utils.data import Dataset, DataLoader, DistributedSampler
 from tqdm import tqdm
 from transformers import AutoProcessor, AutoModel
 from inference_compat import (
+    BenchmarkInferenceWorker,
     apply_chat_template,
     build_generate_kwargs,
     decode_generation_output,
+    has_physical_atoms,
     prepare_generation_inputs,
     process_vision_info,
 )
@@ -39,7 +41,7 @@ def get_args():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="./work_dirs/locany_baseline",
+        default="./work_dirs/lam_baseline",
     )
     parser.add_argument(
         "--test_jsonl_path",
@@ -61,6 +63,23 @@ def get_args():
     parser.add_argument("--max_new_tokens", type=int, default=4096)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument(
+        "--per_category_training_prompt",
+        action="store_true",
+        help="Query each positive category separately with the visual-primitive "
+        "training prompt, then merge the predictions per image.",
+    )
+    parser.add_argument(
+        "--multiturn_training_prompt",
+        action="store_true",
+        help="Query all positive categories in one conversation with the image only "
+        "in the first turn, like the multi-turn training records.",
+    )
+    parser.add_argument(
+        "--vflash_box_prompt",
+        action="store_true",
+        help="Add the box and coordinate paragraphs to the training prompt.",
+    )
+    parser.add_argument(
         "--short_side_size",
         type=int,
         default=None,
@@ -70,8 +89,15 @@ def get_args():
         "--generation_mode",
         type=str,
         default="hybrid",
-        choices=["fast", "slow", "hybrid"],
+        choices=["fast", "slow", "hybrid", "ar", "vflash"],
         help="Generation mode: 'fast' (MTP only), 'slow' (AR only), 'hybrid' (MTP + AR fallback).",
+    )
+    parser.add_argument(
+        "--draft_model_path",
+        type=str,
+        default=None,
+        help="VFlash drafter of an Eagle Embodied target, used with --generation_mode vflash "
+        "(any other mode decodes Eagle Embodied autoregressively).",
     )
 
     # DDP parameters
@@ -83,7 +109,24 @@ def get_args():
     parser.add_argument("--use_tcp", action="store_true", help="Use TCP for communication")
     parser.add_argument("--local_rank", type=int, default=-1, help="Local rank (set by torchrun)")
     
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.vflash_box_prompt and not (args.per_category_training_prompt or args.multiturn_training_prompt):
+        parser.error("--vflash_box_prompt requires a per-category or multiturn training prompt")
+    return args
+
+
+def visual_primitive_question(category, vflash_box_prompt=False):
+    question = f"Locate every instance of {category}. Return only the requested visual-primitive format."
+    if vflash_box_prompt:
+        question += (
+            "\n\nRepresent each bounding box as <box><x1><y1><x2><y2></box>, "
+            "where (x1,y1) is the top-left and (x2,y2) is the bottom-right corner."
+            "\n\nCoordinates are 2D image coordinates, with x and y normalized to "
+            "the range [0, 1000] along the image width and height, respectively. "
+            "The origin is at the top-left corner, with x increasing to the right "
+            "and y increasing downward. /no_think"
+        )
+    return question
 
 
 def setup_distributed():
@@ -273,13 +316,19 @@ def resize_image_short_side(image, short_side_size):
     return resized_image, scale_factor
 
 
-def parse_bbox_with_labels(text):
+def parse_bbox_with_labels(text, objects=False):
     """Parse <ref>category</ref><box><x1><y1><x2><y2></box> format.
     Returns [(category, [x1, y1, x2, y2]), ...]
+    ``objects`` also accepts the boxes wrapped in <objects>...</objects>.
     """
     results = []
     # Match <ref>category</ref> followed by all <box>...</box>
     ref_pattern = r'<ref>([^<]+)</ref>((?:<box>.*?</box>)+)'
+    if objects:
+        ref_pattern = (
+            r'<ref>([^<]+)</ref>\s*(?:<objects>)?\s*'
+            r'((?:<box>.*?</box>)+)\s*(?:</objects>)?'
+        )
     box_pattern = (
         r'<box>\s*<\s*([0-9]+(?:\.[0-9]+)?)\s*>\s*'
         r'<\s*([0-9]+(?:\.[0-9]+)?)\s*>\s*'
@@ -325,7 +374,7 @@ def convert_normalized_bbox_to_absolute(nor_bbox, img_size):
     return [x_min, y_min, x_max, y_max]
 
 
-def parse_prediction(text, w, h):
+def parse_prediction(text, w, h, objects=False):
     """Parse model output text and extract bounding boxes grouped by category.
 
     Input format example:
@@ -342,7 +391,7 @@ def parse_prediction(text, w, h):
     result = {}
 
     # Parse <ref>category</ref><box>...</box> format
-    parsed_boxes = parse_bbox_with_labels(text)
+    parsed_boxes = parse_bbox_with_labels(text, objects=objects)
 
     for category, nor_bbox in parsed_boxes:
         # Convert normalized coordinates to absolute coordinates
@@ -457,7 +506,23 @@ def main():
     if is_main_process():
         print(f"Loading model from: {args.model_path}")
         print(f"Generation Mode: {args.generation_mode}")
-    worker = LocateAnythingWorker(args.model_path, device=device, generation_mode=args.generation_mode)
+    if has_physical_atoms(args.model_path):
+        # VFlash targets (Eagle Embodied with physical atoms) run through the
+        # shared adapter; --generation_mode slow gives their AR baseline.
+        bbox_hybrid = None
+        if args.generation_mode == "vflash":
+            from eaglevl.model.vflash.bbox_hybrid import BBoxHybridConfig
+
+            bbox_hybrid = BBoxHybridConfig()
+        worker = BenchmarkInferenceWorker(
+            args.model_path,
+            device=device,
+            generation_mode=args.generation_mode,
+            draft_model_path=args.draft_model_path,
+            bbox_hybrid=bbox_hybrid,
+        )
+    else:
+        worker = LocateAnythingWorker(args.model_path, device=device, generation_mode=args.generation_mode)
     
     # Load test data
     if is_main_process():
@@ -522,11 +587,42 @@ def main():
                 print(f"[Resize] Original: {original_w}x{original_h} -> Resized: {resized_w}x{resized_h} (scale: {scale_factor:.4f})")
         
         # Run inference
-        output, question = worker.generate(
-            image,
-            categories,
-            max_new_tokens=args.max_new_tokens,
-        )
+        category_predictions = None
+        if args.multiturn_training_prompt or args.per_category_training_prompt:
+            # The training-prompt modes ask for one category at a time and
+            # attribute each answer's boxes to the queried category.
+            questions = [
+                visual_primitive_question(category, args.vflash_box_prompt)
+                for category in categories
+            ]
+            if args.multiturn_training_prompt:
+                raw_outputs = worker.generate_multiturn(
+                    image,
+                    questions,
+                    max_new_tokens=args.max_new_tokens,
+                )
+            else:
+                raw_outputs = [
+                    worker.generate(image, question_i, max_new_tokens=args.max_new_tokens)
+                    for question_i in questions
+                ]
+            category_predictions = {}
+            for category, output_i in zip(categories, raw_outputs):
+                parsed_i = parse_prediction(output_i, image.size[0], image.size[1], objects=True)
+                category_predictions[str(category)] = [
+                    coords
+                    for coords_list in parsed_i.values()
+                    for coords in coords_list
+                    if isinstance(coords, (list, tuple)) and len(coords) == 4
+                ]
+            output = "\n".join(raw_outputs)
+            question = " | ".join(questions)
+        else:
+            output, question = worker.generate(
+                image,
+                categories,
+                max_new_tokens=args.max_new_tokens,
+            )
         
         if is_main_process():
             print(f"[{dataset_name}]")
@@ -536,7 +632,7 @@ def main():
         try:
             # Parse using resized dimensions, then convert back to original size
             resized_w, resized_h = image.size
-            extracted_predictions = parse_prediction(
+            extracted_predictions = category_predictions if category_predictions is not None else parse_prediction(
                     output,
                     resized_w,
                     resized_h,
